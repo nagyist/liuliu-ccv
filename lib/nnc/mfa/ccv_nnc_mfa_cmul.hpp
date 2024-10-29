@@ -2,6 +2,7 @@
 #define GUARD_ccv_nnc_mfa_cmul_hpp
 
 typedef struct {
+  uint8_t conjugate;
   uint64_t data_type;
   uint32_t astride[3];
   uint32_t bstride[3];

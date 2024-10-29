@@ -26,6 +26,7 @@ void ccv_nnc_mfa_encode_cmul(ccv_nnc_mfa_context_t* context, ccv_nnc_mfa_cmul_pa
   CCV_NNC_MFA_PRECONDITION(num_tensors == 3);
 
   CMulDescriptor descriptor;
+  descriptor.conjugate = params.conjugate ? 1 : 0;
   descriptor.memoryPrecision = (params.data_type == MTL::DataTypeFloat) ? GEMMOperandPrecision::FP32 : GEMMOperandPrecision::FP16;
   descriptor.stridesA[0] = params.astride[0];
   descriptor.stridesA[1] = params.astride[1];

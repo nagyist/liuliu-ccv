@@ -8,9 +8,10 @@
 #include "GEMMOperandPrecision.hpp"
 
 struct CMulKernelDescriptor {
+  uint8_t conjugate;
+  uint8_t value;
   GEMMOperandPrecision memoryPrecision;
-  unsigned int value;
-  constexpr bool operator==(const CMulKernelDescriptor &rhs) const { return value == rhs.value && memoryPrecision == rhs.memoryPrecision; }
+  constexpr bool operator==(const CMulKernelDescriptor &rhs) const { return value == rhs.value && memoryPrecision == rhs.memoryPrecision && conjugate == rhs.conjugate; }
 };
 
 template<>
@@ -22,7 +23,9 @@ struct std::hash<CMulKernelDescriptor>
 struct CMulKernel;
 
 struct CMulDescriptor {
-  unsigned int value;
+  uint8_t conjugate;
+
+  uint8_t value;
 
   GEMMOperandPrecision memoryPrecision;
 

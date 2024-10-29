@@ -6,6 +6,7 @@
 bool CMulDescriptor::operator==(const CMulDescriptor& rhs) const {
   return
   memoryPrecision == rhs.memoryPrecision &&
+  conjugate == rhs.conjugate &&
   value == rhs.value &&
   simd_all(stridesA == rhs.stridesA) &&
   simd_all(stridesB == rhs.stridesB) &&
@@ -43,8 +44,9 @@ std::pair<CMulKernelDescriptor, PipelineValue<CMulKernel> *> CMulDescriptor::fin
   };
 
   CMulKernelDescriptor kernelDesc;
-  kernelDesc.memoryPrecision = memoryPrecision;
+  kernelDesc.conjugate = conjugate;
   kernelDesc.value = value;
+  kernelDesc.memoryPrecision = memoryPrecision;
 
   // WARNING: The owner must explicitly retain the compute pipeline.
   auto createPipeline =

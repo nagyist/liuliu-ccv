@@ -15,9 +15,11 @@ struct CMulKernel {
   /// The number of threads per group.
   MTL::Size threadgroupSize;
 
-  GEMMOperandPrecision memoryPrecision;
+  uint8_t conjugate;
 
-  unsigned int value;
+  uint8_t value;
+
+  GEMMOperandPrecision memoryPrecision;
 
   CMulKernel(CMulKernelDescriptor descriptor, MTL::Device *const device);
 
