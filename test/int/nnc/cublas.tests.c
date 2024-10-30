@@ -2946,6 +2946,7 @@ TEST_CASE("scaled dot product attention gradient with flash_attn")
 		ccv_nnc_tensor_free(gpu_dq_tensor);
 		ccv_nnc_tensor_free(gpu_dk_tensor);
 		ccv_nnc_tensor_free(gpu_dv_tensor);
+		ccv_nnc_tensor_free(gpu_softmax_lse);
 	}
 #undef num_long_trials
 #undef num_short_trials

@@ -2688,14 +2688,14 @@ std::string AttentionKernel::computeD() const noexcept {
     source.SetValue("DO_LOCATION", operandLocationValue(AttentionOperand::dO));
     source.SetValue("MEMORY_NAME_DO", memoryName(AttentionOperand::dO));
     source.SetValue("REGISTER_NAME_DO", registerName(AttentionOperand::dO));
-    source.SetValue("LOAD_FUNCTION_DO", registerName(AttentionOperand::dO));
+    source.SetValue("LOAD_FUNCTION_DO", loadFunction(AttentionOperand::dO));
     source.SetValue("LEADING_DIMENSION_DO", leadingDimension(AttentionOperand::dO));
     source.SetValue("LEADING_BLOCK_DIMENSION_DO", std::to_string(leadingBlockDimension(AttentionOperand::dO)));
     source.SetValue("TRANSPOSED_DO", transposed(AttentionOperand::dO) ? "true" : "false");
     source.SetValue("O_LOCATION", operandLocationValue(AttentionOperand::O));
     source.SetValue("MEMORY_NAME_O", memoryName(AttentionOperand::O));
     source.SetValue("REGISTER_NAME_O", registerName(AttentionOperand::O));
-    source.SetValue("LOAD_FUNCTION_O", registerName(AttentionOperand::O));
+    source.SetValue("LOAD_FUNCTION_O", loadFunction(AttentionOperand::O));
     source.SetValue("LEADING_DIMENSION_O", leadingDimension(AttentionOperand::O));
     source.SetValue("LEADING_BLOCK_DIMENSION_O", std::to_string(leadingBlockDimension(AttentionOperand::O)));
     source.SetValue("TRANSPOSED_O", transposed(AttentionOperand::O) ? "true" : "false");
@@ -2721,7 +2721,7 @@ std::string AttentionKernel::computeD() const noexcept {
         {{O_LOCATION}}, {{LEADING_DIMENSION_O}}, 
         offset_src, {{TRANSPOSED_O}});
 
-      auto dO_dst = (threadgroup{{MEMORY_NAME_DO}})*)(threadgroup_block);
+      auto dO_dst = (threadgroup {{MEMORY_NAME_DO}}*)(threadgroup_block);
       auto O_dst = (threadgroup {{MEMORY_NAME_O}}*)(
         threadgroup_block + {{BLOCK_BYTES_DERIVATIVE_O}});
 
@@ -2766,7 +2766,7 @@ std::string AttentionKernel::computeD() const noexcept {
     simdgroup_matrix_storage<{{REGISTER_NAME_O}}> O;
     dO.{{LOAD_FUNCTION_DO}}(
       dO_block, {{LEADING_BLOCK_DIMENSION_DO}},
-      origin, {{TRANSPOSED_DO}}));
+      origin, {{TRANSPOSED_DO}});
     O.{{LOAD_FUNCTION_O}}(
       O_block, {{LEADING_BLOCK_DIMENSION_O}},
       origin, {{TRANSPOSED_O}});
