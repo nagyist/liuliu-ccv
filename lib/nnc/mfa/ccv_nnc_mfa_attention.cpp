@@ -128,7 +128,7 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
       if (tensors[5]) {
         encoder->useResource(tensors[5], MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
       }
-        encoder->setBuffer(tensors[0], tensor_offsets[0], AttentionOperand(AttentionOperand::Q).bufferIndex());
+      encoder->setBuffer(tensors[0], tensor_offsets[0], AttentionOperand(AttentionOperand::Q).bufferIndex());
       encoder->setBuffer(tensors[1], tensor_offsets[1], AttentionOperand(AttentionOperand::K).bufferIndex());
       encoder->setBuffer(tensors[2], tensor_offsets[2], AttentionOperand(AttentionOperand::V).bufferIndex());
       if (attentionDesc.lowPrecisionInputs) {
@@ -198,6 +198,15 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
       auto backwardKeyValueKernel = backwardKeyValuePipelineValue->kernel;
       auto backwardKeyValuePipeline = backwardKeyValuePipelineValue->pipeline;
 
+      auto scratch_size = 0;
+      if (attentionDesc.lowPrecisionInputs) {
+        // Need scratch space for FP16 output.
+        scratch_size += sizeof(float) * (hash.R + hash.C * 2) * hash.D * hash.Hq * attentionDesc.batchDimension;
+      }
+      // Need scratch space for D.
+      scratch_size += sizeof(float) * hash.R * hash.Hq * attentionDesc.batchDimension;
+      auto scratch = context->request_scratch(scratch_size);
+
       // Allocate a new command.
       auto backwardQueryEncoder = command_batch->startCommand();
       backwardQueryEncoder->setComputePipelineState(backwardQueryPipeline.get());
@@ -210,14 +219,6 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
       backwardQueryEncoder->useResource(tensors[3], MTL::ResourceUsageRead);
       backwardQueryEncoder->useResource(tensors[4], MTL::ResourceUsageRead);
       backwardQueryEncoder->useResource(tensors[5], MTL::ResourceUsageRead);
-      auto scratch_size = 0;
-      if (attentionDesc.lowPrecisionInputs) {
-        // Need scratch space for FP16 output.
-        scratch_size += sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension * 3;
-      }
-      // Need scratch space for D.
-      scratch_size += sizeof(float) * hash.R * hash.Hq * attentionDesc.batchDimension;
-      auto scratch = context->request_scratch(scratch_size);
       backwardQueryEncoder->useResource(scratch, MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
       if (!attentionDesc.lowPrecisionInputs) {
         backwardQueryEncoder->useResource(tensors[6], MTL::ResourceUsageWrite);
@@ -231,7 +232,7 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
       backwardQueryEncoder->setBuffer(tensors[5], tensor_offsets[5], AttentionOperand(AttentionOperand::dO).bufferIndex());
       if (attentionDesc.lowPrecisionInputs) {
         backwardQueryEncoder->setBuffer(scratch, 0, AttentionOperand(AttentionOperand::dQ).bufferIndex());
-        backwardQueryEncoder->setBuffer(scratch, sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension * 3, AttentionOperand(AttentionOperand::D).bufferIndex());
+        backwardQueryEncoder->setBuffer(scratch, sizeof(float) * (hash.R + hash.C * 2) * hash.D * hash.Hq * attentionDesc.batchDimension, AttentionOperand(AttentionOperand::D).bufferIndex());
       } else {
         backwardQueryEncoder->setBuffer(tensors[6], tensor_offsets[6], AttentionOperand(AttentionOperand::dQ).bufferIndex());
         backwardQueryEncoder->setBuffer(scratch, 0, AttentionOperand(AttentionOperand::D).bufferIndex());
@@ -268,24 +269,24 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
         backwardKeyValueEncoder->useResource(tensors[8], MTL::ResourceUsageWrite);
       }
 
-      backwardQueryEncoder->setBuffer(tensors[0], tensor_offsets[0], AttentionOperand(AttentionOperand::Q).bufferIndex());
-      backwardQueryEncoder->setBuffer(tensors[1], tensor_offsets[1], AttentionOperand(AttentionOperand::K).bufferIndex());
-      backwardQueryEncoder->setBuffer(tensors[2], tensor_offsets[2], AttentionOperand(AttentionOperand::V).bufferIndex());
-      backwardQueryEncoder->setBuffer(tensors[3], tensor_offsets[3], AttentionOperand(AttentionOperand::O).bufferIndex());
-      backwardQueryEncoder->setBuffer(tensors[4], tensor_offsets[4], AttentionOperand(AttentionOperand::L).bufferIndex());
-      backwardQueryEncoder->setBuffer(tensors[5], tensor_offsets[5], AttentionOperand(AttentionOperand::dO).bufferIndex());
+      backwardKeyValueEncoder->setBuffer(tensors[0], tensor_offsets[0], AttentionOperand(AttentionOperand::Q).bufferIndex());
+      backwardKeyValueEncoder->setBuffer(tensors[1], tensor_offsets[1], AttentionOperand(AttentionOperand::K).bufferIndex());
+      backwardKeyValueEncoder->setBuffer(tensors[2], tensor_offsets[2], AttentionOperand(AttentionOperand::V).bufferIndex());
+      backwardKeyValueEncoder->setBuffer(tensors[3], tensor_offsets[3], AttentionOperand(AttentionOperand::O).bufferIndex());
+      backwardKeyValueEncoder->setBuffer(tensors[4], tensor_offsets[4], AttentionOperand(AttentionOperand::L).bufferIndex());
+      backwardKeyValueEncoder->setBuffer(tensors[5], tensor_offsets[5], AttentionOperand(AttentionOperand::dO).bufferIndex());
       if (attentionDesc.lowPrecisionInputs) {
-        backwardQueryEncoder->setBuffer(scratch, sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension, AttentionOperand(AttentionOperand::dK).bufferIndex());
-        backwardQueryEncoder->setBuffer(scratch, sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension * 2, AttentionOperand(AttentionOperand::dV).bufferIndex());
-        backwardQueryEncoder->setBuffer(scratch, sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension * 3, AttentionOperand(AttentionOperand::D).bufferIndex());
+        backwardKeyValueEncoder->setBuffer(scratch, sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension, AttentionOperand(AttentionOperand::dK).bufferIndex());
+        backwardKeyValueEncoder->setBuffer(scratch, sizeof(float) * (hash.R + hash.C) * hash.D * hash.Hq * attentionDesc.batchDimension, AttentionOperand(AttentionOperand::dV).bufferIndex());
+        backwardKeyValueEncoder->setBuffer(scratch, sizeof(float) * (hash.R + hash.C * 2) * hash.D * hash.Hq * attentionDesc.batchDimension, AttentionOperand(AttentionOperand::D).bufferIndex());
       } else {
-        backwardQueryEncoder->setBuffer(scratch, 0, AttentionOperand(AttentionOperand::D).bufferIndex());
-        backwardQueryEncoder->setBuffer(tensors[7], tensor_offsets[7], AttentionOperand(AttentionOperand::dK).bufferIndex());
-        backwardQueryEncoder->setBuffer(tensors[8], tensor_offsets[8], AttentionOperand(AttentionOperand::dV).bufferIndex());
+        backwardKeyValueEncoder->setBuffer(scratch, 0, AttentionOperand(AttentionOperand::D).bufferIndex());
+        backwardKeyValueEncoder->setBuffer(tensors[7], tensor_offsets[7], AttentionOperand(AttentionOperand::dK).bufferIndex());
+        backwardKeyValueEncoder->setBuffer(tensors[8], tensor_offsets[8], AttentionOperand(AttentionOperand::dV).bufferIndex());
       }
 
       MTL::Size backwardKeyValueGridSize
-      (ceilDivide(int64_t(hash.R), backwardKeyValueKernel->blockDimensions[0]),
+      (ceilDivide(int64_t(hash.C), backwardKeyValueKernel->blockDimensions[0]),
        hash.Hq,
        attentionDesc.batchDimension);
       MTL::Size backwardKeyValueGroupSize
@@ -315,12 +316,14 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
           tensor_offsets[6]
         };
         ccv_nnc_mfa_encode_cast(context, cast_params, command_batch, cast_tensors, cast_tensor_offsets);
-		cast_tensors[1] = tensors[7];
+        cast_params.length = hash.C * hash.D * hash.Hq * attentionDesc.batchDimension;
+        ccv_nnc_mfa_prepare_cast(context, cast_params);
+        cast_tensors[1] = tensors[7];
         cast_tensor_offsets[0] = sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension;
         cast_tensor_offsets[1] = tensor_offsets[7];
         ccv_nnc_mfa_encode_cast(context, cast_params, command_batch, cast_tensors, cast_tensor_offsets);
-		cast_tensors[1] = tensors[8];
-        cast_tensor_offsets[0] = sizeof(float) * hash.R * hash.D * hash.Hq * attentionDesc.batchDimension * 2;
+        cast_tensors[1] = tensors[8];
+        cast_tensor_offsets[0] = sizeof(float) * (hash.R + hash.C) * hash.D * hash.Hq * attentionDesc.batchDimension;
         cast_tensor_offsets[1] = tensor_offsets[8];
         ccv_nnc_mfa_encode_cast(context, cast_params, command_batch, cast_tensors, cast_tensor_offsets);
       }
