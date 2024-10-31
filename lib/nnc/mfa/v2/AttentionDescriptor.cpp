@@ -265,7 +265,7 @@ AttentionOperands<GEMMOperandPrecision> AttentionDescriptor::createMemoryPrecisi
   // unrolled (head dimension vastly exceeds head block dimension).
   if (lowPrecisionIntermediates) {
     memoryPrecisions[AttentionOperand::L] = GEMMOperandPrecision::FP16;
-    memoryPrecisions[AttentionOperand::D] = GEMMOperandPrecision::FP32; // GEMMOperandPrecision::BF16;
+    memoryPrecisions[AttentionOperand::D] = GEMMOperandPrecision::BF16;
   } else {
     memoryPrecisions[AttentionOperand::L] = GEMMOperandPrecision::FP32;
     memoryPrecisions[AttentionOperand::D] = GEMMOperandPrecision::FP32;
@@ -356,7 +356,7 @@ AttentionOperands<GEMMOperandPrecision> AttentionDescriptor::createRegisterPreci
   // The register precision of L/D only counts for backward key-value.
   if (lowPrecisionIntermediates) {
     registerPrecisions[AttentionOperand::L] = GEMMOperandPrecision::FP16;
-    registerPrecisions[AttentionOperand::D] = GEMMOperandPrecision::FP32;
+    registerPrecisions[AttentionOperand::D] = hasNativeBF16Casting ? GEMMOperandPrecision::BF16 : GEMMOperandPrecision::FP32;
   } else {
     registerPrecisions[AttentionOperand::L] = GEMMOperandPrecision::FP32;
     registerPrecisions[AttentionOperand::D] = GEMMOperandPrecision::FP32;
@@ -383,7 +383,7 @@ AttentionOperands<GEMMOperandPrecision> AttentionDescriptor::createRegisterPreci
     registerPrecisions[AttentionOperand::S] = lowPrecisionInputs ? GEMMOperandPrecision::FP16 : GEMMOperandPrecision::FP32;
     registerPrecisions[AttentionOperand::P] = GEMMOperandPrecision::FP16;
     registerPrecisions[AttentionOperand::dP] = GEMMOperandPrecision::FP32;
-    registerPrecisions[AttentionOperand::dS] = GEMMOperandPrecision::FP32;
+    registerPrecisions[AttentionOperand::dS] = hasNativeBF16Casting ? GEMMOperandPrecision::BF16 : GEMMOperandPrecision::FP32;
   } else {
     registerPrecisions[AttentionOperand::S] = GEMMOperandPrecision::FP32;
     registerPrecisions[AttentionOperand::P] = GEMMOperandPrecision::FP32;

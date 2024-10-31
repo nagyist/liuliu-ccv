@@ -395,7 +395,24 @@ unsigned short AttentionKernel::createThreadgroupMemoryAllocation() const noexce
 std::string AttentionKernel::createSource() const noexcept {
   CodeWriter source;
 
-  bool injectBF16Methods = (memoryPrecisions[AttentionOperand::Q] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::K] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::S] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::P] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::V] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::O] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::L] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::D] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dO] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dV] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dP] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dS] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dK] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dQ] == GEMMOperandPrecision::BF16);
+  bool injectBF16Methods = false;
+  switch (type.value) {
+    case AttentionKernelType::forward:
+      if ((memoryPrecisions[AttentionOperand::Q] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::K] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::S] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::P] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::V] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::O] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::L] == GEMMOperandPrecision::BF16)) {
+        injectBF16Methods = true;
+      }
+      break;
+    case AttentionKernelType::backwardQuery:
+      if ((memoryPrecisions[AttentionOperand::Q] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::K] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::S] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::P] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::V] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::O] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::L] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::D] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dO] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dP] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dS] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dQ] == GEMMOperandPrecision::BF16)) {
+        injectBF16Methods = true;
+      }
+      break;
+    case AttentionKernelType::backwardKeyValue:
+      if ((memoryPrecisions[AttentionOperand::Q] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::K] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::S] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::P] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::V] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::O] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::L] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::D] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dO] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dV] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dP] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dS] == GEMMOperandPrecision::BF16) || (memoryPrecisions[AttentionOperand::dK] == GEMMOperandPrecision::BF16)) {
+        injectBF16Methods = true;
+      }
+      break;
+  }
 
   // Inject the contents of the headers.
   source += createMetalSimdgroupEvent() + "\n";
