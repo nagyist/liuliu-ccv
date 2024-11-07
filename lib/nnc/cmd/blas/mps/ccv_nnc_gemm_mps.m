@@ -783,6 +783,7 @@ static int _ccv_nnc_gemm_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint
 						.B_trans = (is_transpose_w ? 1 : 0),
 						.D_trans = 0,
 						.fused_bias = 0,
+						.register_float = 1,
 
 						.batch_dimension = g_batch_size,
 						.batch_stride_a = w_batch_size > 1 ? w_rows * w_cols : 0,
@@ -802,6 +803,7 @@ static int _ccv_nnc_gemm_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint
 						.B_trans = (is_transpose_w ? 0 : 1),
 						.D_trans = 0,
 						.fused_bias = 0,
+						.register_float = 1,
 
 						.batch_dimension = g_batch_size,
 						.batch_stride_a = g_batch_size > 1 ? g_rows * w_cols : 0,
@@ -829,6 +831,7 @@ static int _ccv_nnc_gemm_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint
 						.B_trans = (is_transpose_a ? 1 : 0),
 						.D_trans = 0,
 						.fused_bias = 0,
+						.register_float = 1,
 
 						.batch_dimension = g_batch_size,
 						.batch_stride_a = g_batch_size > 1 ? dw_cols * g_rows : 0,
@@ -848,6 +851,7 @@ static int _ccv_nnc_gemm_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint
 						.B_trans = 0,
 						.D_trans = 0,
 						.fused_bias = 0,
+						.register_float = 1,
 
 						.batch_dimension = g_batch_size,
 						.batch_stride_a = a_batch_size > 1 ? dw_rows * g_rows : 0,
