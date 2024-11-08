@@ -3,6 +3,7 @@
 #include "ccv_nnc_internal.h"
 #include "ccv_internal.h"
 #include "_ccv_cnnp_model.h"
+#include "_ccv_nnc_graph.h"
 
 // MARK - Level-5 API
 
@@ -1800,6 +1801,42 @@ static void _ccv_cnnp_model_multistage_jit_0(ccv_cnnp_model_t* const model, cons
 			.d = *(int*)ccv_array_get(backward_from, i),
 			.graph = compiled_data->graph,
 		};
+	// If there are any set node (to set some tensors to 0) inserted through backward pass, these won't be executed if we just do sources -> evaluate.to_ops, backward.from_ops -> destinations. We need this logic to find out these nodes and explicitly adding them to backward.from_ops.
+	ccv_nnc_graph_exec_info_t* const exec_info = (ccv_nnc_graph_exec_info_t*)ccv_array_get(compiled_data->graph->exec_info, 0);
+	const int exec_info_size = compiled_data->graph->exec_info->rnum;
+	uint32_t* const visited = cccalloc((exec_info_size + 31) >> 5, sizeof(uint32_t));
+	const ccv_nnc_graph_exec_t* const sources = (ccv_nnc_graph_exec_t*)ccv_array_get(compiled_data->graph->sources, 0);
+	const int source_size = compiled_data->graph->sources->rnum;
+	ccv_nnc_graph_visit_t* visit = ccv_nnc_graph_visit_new(compiled_data->graph, exec_info, exec_info_size, sources, source_size, compiled_data->evaluate.to_ops, compiled_data->evaluate.to_op_size, 0);
+	ccv_nnc_graph_visit_for(visit, exec_info, node, idx) {
+		visited[(idx >> 5)] |= (1u << (idx & 31));
+	} ccv_nnc_graph_visit_endfor
+	ccv_nnc_graph_visit_free(visit);
+	const ccv_nnc_graph_exec_t* const destinations = (ccv_nnc_graph_exec_t*)ccv_array_get(compiled_data->graph->destinations, 0);
+	const int destination_size = compiled_data->graph->destinations->rnum;
+	visit = ccv_nnc_graph_visit_new(compiled_data->graph, exec_info, exec_info_size, compiled_data->backward.from_ops, compiled_data->backward.from_op_size, destinations, destination_size, 0);
+	ccv_nnc_graph_visit_for(visit, exec_info, node, idx) {
+		visited[(idx >> 5)] |= (1u << (idx & 31));
+	} ccv_nnc_graph_visit_endfor
+	ccv_nnc_graph_visit_free(visit);
+	// Find any missing nodes to be added as source. Right now, these are only set nodes.
+	for (i = 0; i < exec_info_size; i++)
+		if (!(visited[(i >> 5)] & (1u << (i & 31))))
+		{
+			assert(exec_info[i].cmd.cmd == CCV_NNC_SET_FORWARD);
+			ccv_array_add_unique_int(backward_from, i);
+		}
+	ccfree(visited);
+	if (backward_from->rnum != compiled_data->backward.from_op_size) // If it doesn't match, need to redo this.
+	{
+		compiled_data->backward.from_op_size = backward_from->rnum;
+		compiled_data->backward.from_ops = (ccv_nnc_graph_exec_t*)ccrealloc(compiled_data->backward.from_ops, sizeof(ccv_nnc_graph_exec_t) * backward_from->rnum);
+		for (i = 0; i < backward_from->rnum; i++)
+			compiled_data->backward.from_ops[i] = (ccv_nnc_graph_exec_t){
+				.d = *(int*)ccv_array_get(backward_from, i),
+				.graph = compiled_data->graph,
+			};
+	}
 	ccv_array_free(backward_from);
 	ccv_nnc_graph_set_default_static_schedule(compiled_data->graph, compiled_data->stream_type, model->max_stream_count);
 	ccv_nnc_graph_autotune(compiled_data->graph, model->workspace_size, 0, TRAVERSE_FULL);
