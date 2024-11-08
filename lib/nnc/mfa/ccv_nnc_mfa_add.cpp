@@ -31,9 +31,17 @@ void ccv_nnc_mfa_encode_add(ccv_nnc_mfa_context_t* context, ccv_nnc_mfa_add_para
   CCV_NNC_MFA_PRECONDITION(num_tensors == 3);
   
   encoder->setComputePipelineState(pipeline->add_pso.get());
-  encoder->useResource(tensors[0], MTL::ResourceUsageRead);
-  encoder->useResource(tensors[1], MTL::ResourceUsageRead);
-  encoder->useResource(tensors[2], MTL::ResourceUsageWrite);
+  if (tensors[0] == tensors[2]) {
+    encoder->useResource(tensors[0], MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
+    encoder->useResource(tensors[1], MTL::ResourceUsageRead);
+  } else if (tensors[1] == tensors[2]) {
+    encoder->useResource(tensors[0], MTL::ResourceUsageRead);
+    encoder->useResource(tensors[1], MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
+  } else {
+    encoder->useResource(tensors[0], MTL::ResourceUsageRead);
+    encoder->useResource(tensors[1], MTL::ResourceUsageRead);
+    encoder->useResource(tensors[2], MTL::ResourceUsageWrite);
+  }
 
   auto grid_size = pipeline->grid_size;
   CCV_NNC_MFA_PRECONDITION(grid_size.depth > 0);
