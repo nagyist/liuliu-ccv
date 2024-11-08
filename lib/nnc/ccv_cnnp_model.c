@@ -1819,13 +1819,17 @@ static void _ccv_cnnp_model_multistage_jit_0(ccv_cnnp_model_t* const model, cons
 		visited[(idx >> 5)] |= (1u << (idx & 31));
 	} ccv_nnc_graph_visit_endfor
 	ccv_nnc_graph_visit_free(visit);
+	visit = ccv_nnc_graph_visit_new(compiled_data->graph, exec_info, exec_info_size, sources, source_size, destinations, destination_size, 0);
 	// Find any missing nodes to be added as source. Right now, these are only set nodes.
-	for (i = 0; i < exec_info_size; i++)
-		if (!(visited[(i >> 5)] & (1u << (i & 31))))
+	ccv_nnc_graph_visit_for(visit, exec_info, node, idx) {
+		if (!(visited[(idx >> 5)] & (1u << (idx & 31))))
 		{
-			assert(exec_info[i].cmd.cmd == CCV_NNC_SET_FORWARD);
-			ccv_array_add_unique_int(backward_from, i);
+			assert(exec_info[idx].cmd.cmd == CCV_NNC_SET_FORWARD);
+			if (exec_info[idx].cmd.info.blas.a[0] == 0) // Special-casing for empty out the tensor set function, not for the set grad to 1 one.
+				ccv_array_add_unique_int(backward_from, idx);
 		}
+	} ccv_nnc_graph_visit_endfor
+	ccv_nnc_graph_visit_free(visit);
 	ccfree(visited);
 	if (backward_from->rnum != compiled_data->backward.from_op_size) // If it doesn't match, need to redo this.
 	{
