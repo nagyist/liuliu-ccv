@@ -278,8 +278,36 @@ static int _ccv_nnc_add_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint,
 
 	@autoreleasepool {
 		MPSCommandBuffer* command_buffer = ccv_nnc_stream_context_start_mps_command_buffer(stream_context);
+		int a_transferred = 0;
+		int b_transferred = 0;
+		if (CCV_IS_TENSOR_CONTIGUOUS(g))
+		{
+			const size_t tensor_count = ccv_nnc_tensor_count(g->info);
+			id<MTLBuffer> buffer_g = mpgetbuffer((ccv_nnc_tensor_t*)g);
+			const off_t offset_g = mpgetoffset((ccv_nnc_tensor_t*)g);
+			const size_t size = (ssize_t)ccv_nnc_tensor_count(g->info) * CCV_GET_DATA_TYPE_SIZE(g->info.datatype);
+			if (a && CCV_IS_TENSOR_CONTIGUOUS(a) && p == 1 && ccv_nnc_tensor_count(a->info) == tensor_count)
+			{
+				id<MTLBuffer> buffer_a = mpgetbuffer((ccv_nnc_tensor_t*)a);
+				const off_t offset_a = mpgetoffset((ccv_nnc_tensor_t*)a);
+				id<MTLBlitCommandEncoder> encoder = [command_buffer blitCommandEncoder];
+				[encoder copyFromBuffer:buffer_g sourceOffset:offset_g toBuffer:buffer_a destinationOffset:offset_a size:size];
+				[encoder endEncoding];
+				a_transferred = 1;
+			}
+			if (b && CCV_IS_TENSOR_CONTIGUOUS(b) && q == 1 && ccv_nnc_tensor_count(b->info) == tensor_count)
+			{
+				id<MTLBuffer> buffer_b = mpgetbuffer((ccv_nnc_tensor_t*)b);
+				const off_t offset_b = mpgetoffset((ccv_nnc_tensor_t*)b);
+				id<MTLBlitCommandEncoder> encoder = [command_buffer blitCommandEncoder];
+				[encoder copyFromBuffer:buffer_g sourceOffset:offset_g toBuffer:buffer_b destinationOffset:offset_b size:size];
+				[encoder endEncoding];
+				b_transferred = 1;
+			}
+		}
 
-		if (a && b)
+
+		if ((a && !a_transferred) && (b && !b_transferred))
 		{
 				ccv_nnc_mps_graph_key_t a_key = ccv_nnc_mps_graph_key_new(cmd, 0, hint, flags, inputs, input_size, outputs, output_size);
 				int indices[1];
@@ -327,7 +355,7 @@ static int _ccv_nnc_add_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint,
 				MPSGraphTensorData* data[] = {data_g};
 				ccv_nnc_mps_graph_executable_result(executable, command_buffer, @[data[indices[0]]], (ccv_nnc_tensor_view_t* []){ a, b }, (int*[]){ a->info.dim, b->info.dim }, (int*[]){ a->stride, b->stride }, 2, 0);
 		} else {
-			if (a) {
+			if (a && !a_transferred) {
 				ccv_nnc_mps_graph_key_t a_key = ccv_nnc_mps_graph_key_new(cmd, 1, hint, flags, inputs, input_size, outputs, output_size);
 				int indices[1];
 				MPSGraphExecutable* executable = ccv_nnc_mps_graph_executable_cache(a_key, indices, ^void (MPSGraph* graph, NSMutableArray<MPSGraphTensor*>* inputTensors, NSMutableArray<MPSGraphShapedType*>* inputShapedTypes, NSMutableArray<MPSGraphTensor*>* resultTensors) {
@@ -358,7 +386,7 @@ static int _ccv_nnc_add_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint,
 				MPSGraphTensorData* data[] = {data_g};
 				ccv_nnc_mps_graph_executable_result(executable, command_buffer, @[data[indices[0]]], (ccv_nnc_tensor_view_t* []){ a }, (int*[]){ a->info.dim }, (int*[]){ a->stride }, 1, 0);
 			}
-			if (b) {
+			if (b && !b_transferred) {
 				ccv_nnc_mps_graph_key_t b_key = ccv_nnc_mps_graph_key_new(cmd, 2, hint, flags, inputs, input_size, outputs, output_size);
 				int indices[1];
 				MPSGraphExecutable* executable = ccv_nnc_mps_graph_executable_cache(b_key, indices, ^void (MPSGraph* graph, NSMutableArray<MPSGraphTensor*>* inputTensors, NSMutableArray<MPSGraphShapedType*>* inputShapedTypes, NSMutableArray<MPSGraphTensor*>* resultTensors) {
