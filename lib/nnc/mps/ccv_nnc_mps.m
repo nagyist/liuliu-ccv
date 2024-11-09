@@ -53,7 +53,6 @@ MPSGraphDevice* ccv_nnc_default_mps_device(void)
 
 static os_unfair_lock queue_lock; 
 #define OLD_MAX_COMMAND_BUFFER_SIZE (32)
-#define OLD_LIMITED_COMMAND_BUFFER_SIZE (8)
 static id<MTLCommandBuffer> old_last_command_buffers[OLD_MAX_COMMAND_BUFFER_SIZE];
 static id<MTLCommandBuffer> last_command_buffer;
 
@@ -560,7 +559,7 @@ ccv_nnc_stream_context_t* ccv_nnc_init_stream_context(ccv_nnc_stream_context_t* 
 	return stream_context;
 }
 
-static int enable_unbounded_command_buffers = 1;
+static int command_buffers_watermark = 8;
 
 void ccv_nnc_synchronize_stream_context(const ccv_nnc_stream_context_t* const stream_context)
 {
@@ -568,7 +567,7 @@ void ccv_nnc_synchronize_stream_context(const ccv_nnc_stream_context_t* const st
 	id<MTLCommandBuffer> command_buffer = last_command_buffer;
 	last_command_buffer = nil;
 	int i;
-	const int buffer_size = enable_unbounded_command_buffers ? OLD_MAX_COMMAND_BUFFER_SIZE : OLD_LIMITED_COMMAND_BUFFER_SIZE;
+	const int buffer_size = ccv_min(command_buffers_watermark, OLD_MAX_COMMAND_BUFFER_SIZE);
 	id<MTLCommandBuffer> old_buffers[buffer_size];
 	for (i = 0; i < buffer_size; i++)
 	{
@@ -707,9 +706,14 @@ MPSCommandBuffer* ccv_nnc_stream_context_start_mps_command_buffer(ccv_nnc_stream
 	return [MPSCommandBuffer commandBufferFromCommandQueue:_ccv_nnc_default_queue()];
 }
 
-void ccv_nnc_mps_unbounded_command_buffers(int state)
+int ccv_nnc_mps_queue_watermark(void)
 {
-	enable_unbounded_command_buffers = state;
+	return command_buffers_watermark;
+}
+
+void ccv_nnc_mps_set_queue_watermark(int watermark)
+{
+	command_buffers_watermark = ccv_max(ccv_min(watermark, OLD_MAX_COMMAND_BUFFER_SIZE), 0);
 }
 
 void ccv_nnc_stream_context_finish_command_buffer(ccv_nnc_stream_context_t* const stream_context, MPSCommandBuffer* mps_command_buffer, MTLCommandBatch* command_batch)
@@ -722,7 +726,7 @@ void ccv_nnc_stream_context_finish_command_buffer(ccv_nnc_stream_context_t* cons
 	}
 	
 	int i;
-	const int buffer_size = enable_unbounded_command_buffers ? OLD_MAX_COMMAND_BUFFER_SIZE : OLD_LIMITED_COMMAND_BUFFER_SIZE;
+	const int buffer_size = ccv_min(command_buffers_watermark, OLD_MAX_COMMAND_BUFFER_SIZE);
 	if (!stream_context)
 	{
 		id<MTLCommandBuffer> committed_command_buffer = [mtl_command_buffer retain];

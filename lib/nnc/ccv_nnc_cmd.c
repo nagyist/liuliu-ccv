@@ -714,10 +714,19 @@ void ccv_nnc_set_profiler(int state)
 #endif
 }
 
-void ccv_nnc_set_memory_efficient(int state)
+int ccv_nnc_queue_watermark(void)
+{
+#ifdef HAVE_MPS
+	return ccv_nnc_mps_queue_watermark();
+#else
+	return 0;
+#endif
+}
+
+void ccv_nnc_set_queue_watermark(int watermark)
 {
 #ifdef HAVE_MPS
 	// If we need to be memory efficient, we need to bound how many in-flight command buffers there are.
-	ccv_nnc_mps_unbounded_command_buffers(!state);
+	ccv_nnc_mps_set_queue_watermark(watermark);
 #endif
 }

@@ -885,10 +885,15 @@ CCV_WARN_UNUSED(int) ccv_nnc_cmd_enforce_inplace(const ccv_nnc_cmd_t cmd, const 
  */
 void ccv_nnc_set_profiler(int state);
 /**
- * When have choices between doing things, prefer to be more memory efficient and take performance hit. This is relevant to MPSGraph because if we dispatch all command buffers at full speed, we risk of holding a lot of resources up until all of them executed. Alternatively, we can wait previous one done before proceed, with obvious performance penalties.
- * @param state 1 is on, 0 is off. Default to off.
+ * Set the queue watermark when queueing up GPU commands. This is a Metal-only option.
+ * @param > 0 is how many in-flight GPU commands can have.
  */
-void ccv_nnc_set_memory_efficient(int state);
+void ccv_nnc_set_queue_watermark(int state);
+/**
+ * Get the queue watermark when queueing up GPU commands. This is a Metal-only option.
+ * @return How many in-flight GPU commands can have.
+ */
+CCV_WARN_UNUSED(int) ccv_nnc_queue_watermark(void);
 /**
  * Quantize a given memory region of a given datatype / memory resides, into nbits palette.
  * @param input The input memory region, it can be CCV_64F, CCV_32F or CCV_16F.
