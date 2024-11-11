@@ -88,7 +88,7 @@ kernel void gelu(
   const float4 x_sq = x * x;
   const float4 x_cube = x_sq * x;
   const float4 inner = 0.797884560802865355 * (x + 0.044715 * x_cube);
-  const float4 tanh_inner = tanh(inner);
+  const float4 tanh_inner = precise::tanh(inner);
   const float4 left = 0.5 * x;
   const float4 right = 1 + tanh_inner;
   const float4 left_derivative = 0.5 * right;
@@ -117,7 +117,7 @@ kernel void gelu(
   const float4 x_sq = x * x;
   const float4 x_cube = x_sq * x;
   const float4 inner = 0.797884560802865355 * (x + 0.044715 * x_cube);
-  const float4 tanh_inner = tanh(inner);
+  const float4 tanh_inner = precise::tanh(inner);
   const float4 left = 0.5 * x;
   const float4 right = 1 + tanh_inner;
   const float4 left_derivative = 0.5 * right;
@@ -146,7 +146,7 @@ kernel void gelu(
   const float x_sq = x * x;
   const float x_cube = x_sq * x;
   const float inner = 0.797884560802865355 * (x + 0.044715 * x_cube);
-  const float tanh_inner = tanh(inner);
+  const float tanh_inner = precise::tanh(inner);
   const float left = 0.5 * x;
   const float right = 1 + tanh_inner;
   const float left_derivative = 0.5 * right;
@@ -216,7 +216,7 @@ kernel void gelu(
 ) {
   const uint idx = tpig.x;
   const float4 x = (float4)(src[idx]);
-  destination[idx] = (real4)(0.5 * x * (1 + tanh(0.797884560802865355 * (x + 0.044715 * x * x * x))));
+  destination[idx] = (real4)(0.5 * x * (1 + precise::tanh(0.797884560802865355 * (x + 0.044715 * x * x * x))));
 }
       )";
       } else if (value == 1) {
@@ -234,7 +234,7 @@ kernel void gelu(
   if (idx >= count)
     return;
   const float4 x = (float4)(src[idx]);
-  destination[idx] = (real4)(0.5 * x * (1 + tanh(0.797884560802865355 * (x + 0.044715 * x * x * x))));
+  destination[idx] = (real4)(0.5 * x * (1 + precise::tanh(0.797884560802865355 * (x + 0.044715 * x * x * x))));
 }
       )";
       } else {
@@ -252,7 +252,7 @@ kernel void gelu(
   if (idx >= count)
     return;
   const float x = (float)(src[idx]);
-  destination[idx] = (real)(0.5 * x * (1 + tanh(0.797884560802865355 * (x + 0.044715 * x * x * x))));
+  destination[idx] = (real)(0.5 * x * (1 + precise::tanh(0.797884560802865355 * (x + 0.044715 * x * x * x))));
 }
       )";
       }
