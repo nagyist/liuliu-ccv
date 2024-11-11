@@ -80,7 +80,7 @@ mfa::cast::pipeline::pipeline(mfa::context* context, mfa::cast::hash hash) {
   auto* pool = NS::AutoreleasePool::alloc()->init();
   
   std::string shader;
-  // In this case, we can igore the boundary check.
+  // In this case, we can ignore the boundary check.
   if (hash.length % (4 * 256) == 0) {
     shader = R"(
 #include <metal_stdlib>

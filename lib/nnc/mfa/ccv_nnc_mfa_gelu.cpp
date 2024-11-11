@@ -74,7 +74,13 @@ void ccv_nnc_mfa_encode_gelu(ccv_nnc_mfa_context_t* context, ccv_nnc_mfa_gelu_pa
     }
   }
 
-  const int num_blocks = (params.length + 255) / 256;
+  unsigned int count;
+  if (params.tanh && (params.length % 4 == 0)) {
+    count = params.length / 4;
+  } else {
+    count = params.length;
+  }
+  const int num_blocks = (count + 255) / 256;
   MTL::Size gridSize = MTL::Size(num_blocks, 1, 1);
   CCV_NNC_MFA_PRECONDITION(gridSize.depth > 0);
   encoder->dispatchThreadgroups(gridSize, kernel->threadgroupSize);

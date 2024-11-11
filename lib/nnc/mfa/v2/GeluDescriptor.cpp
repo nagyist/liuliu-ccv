@@ -48,12 +48,13 @@ std::pair<GeluKernelDescriptor, PipelineValue<GeluKernel> *> GeluDescriptor::fin
     // Set the function constants.
     auto constants = NS::TransferPtr
     (MTL::FunctionConstantValues::alloc()->init());
+    uint32_t count;
     if (value == 0) {
     } else if (tanh && value == 1) {
-      uint32_t count = length / 4;
+      count = length / 4;
       constants->setConstantValue(&count, MTL::DataTypeUInt, NS::UInteger(0));
     } else {
-      uint32_t count = length;
+      count = length;
       constants->setConstantValue(&count, MTL::DataTypeUInt, NS::UInteger(0));
     }
 
