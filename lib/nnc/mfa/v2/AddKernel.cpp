@@ -1,9 +1,12 @@
 #include "AddKernel.hpp"
 #include "../ccv_nnc_mfa.hpp"
+#include "CodeWriter.hpp"
 
 #include <algorithm>
 
 AddKernel::AddKernel(AddKernelDescriptor descriptor, MTL::Device *const device) {
+
+  args = descriptor.args;
 
   value = descriptor.value;
 
@@ -29,61 +32,79 @@ unsigned short AddKernel::createThreadgroupMemoryAllocation() const noexcept {
 }
 
 std::string AddKernel::createSource() const noexcept {
-  std::string shader = createConstants() + "\n";
+  CodeWriter source;
+  source += createConstants() + "\n";
+  std::string buffers = "";
+  if (value == 0 || value == 1) {
+    for (int i = 1; i < args; i++) {
+      buffers += "device real4 *src" + std::to_string(i) + " [[buffer(" + std::to_string(i) + ")]],\n";
+    }
+  } else {
+    for (int i = 1; i < args; i++) {
+      buffers += "device real *src" + std::to_string(i) + " [[buffer(" + std::to_string(i) + ")]],\n";
+    }
+  }
+  source.SetValue("OTHER_SOURCE_BUFFERS", buffers);
+  source.SetValue("DESTINATION_INDEX", std::to_string(args));
+  std::string items = " + src1[idx]";
+  for (int i = 2; i < args; i++) {
+    items += " + src" + std::to_string(i) + "[idx]";
+  }
+  source.SetValue("OTHER_SOURCE_ITEMS", items);
   if (value == 0) {
-    shader += R"(
+    source += R"(
 #include <metal_stdlib>
 using namespace metal;
 
 kernel void add(
   device real4 *src0 [[buffer(0)]],
-  device real4 *src1 [[buffer(1)]],
-  device real4 *destination [[buffer(2)]],
+  {{OTHER_SOURCE_BUFFERS}}
+  device real4 *destination [[buffer({{DESTINATION_INDEX}})]],
 
   uint3 tpig [[thread_position_in_grid]]
 ) {
   const uint idx = tpig.x;
-  destination[idx] = src0[idx] + src1[idx];
+  destination[idx] = src0[idx]{{OTHER_SOURCE_ITEMS}};
 }
   )";
   } else if (value == 1) {
-    shader += R"(
+    source += R"(
 #include <metal_stdlib>
 using namespace metal;
 
 kernel void add(
   device real4 *src0 [[buffer(0)]],
-  device real4 *src1 [[buffer(1)]],
-  device real4 *destination [[buffer(2)]],
+  {{OTHER_SOURCE_BUFFERS}}
+  device real4 *destination [[buffer({{DESTINATION_INDEX}})]],
 
   uint3 tpig [[thread_position_in_grid]]
 ) {
   const uint idx = tpig.x;
   if (idx >= count)
     return;
-  destination[idx] = src0[idx] + src1[idx];
+  destination[idx] = src0[idx]{{OTHER_SOURCE_ITEMS}};
 }
   )";
   } else {
-    shader += R"(
+    source += R"(
 #include <metal_stdlib>
 using namespace metal;
 
 kernel void add(
   device real *src0 [[buffer(0)]],
-  device real *src1 [[buffer(1)]],
-  device real *destination [[buffer(2)]],
+  {{OTHER_SOURCE_BUFFERS}}
+  device real *destination [[buffer({{DESTINATION_INDEX}})]],
 
   uint3 tpig [[thread_position_in_grid]]
 ) {
   const uint idx = tpig.x;
   if (idx >= count)
     return;
-  destination[idx] = src0[idx] + src1[idx];
+  destination[idx] = src0[idx]{{OTHER_SOURCE_ITEMS}};
 }
   )";
   }
-  return shader;
+  return source.ToString();
 }
 
 std::string AddKernel::createConstants() const noexcept {

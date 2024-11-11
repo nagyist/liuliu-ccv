@@ -150,6 +150,7 @@ static int _ccv_nnc_add_forw(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint,
 		if (use_mfa) {
 			mtl_command_batch_t* command_batch = ccv_nnc_stream_context_start_command_batch(stream_context);
 			ccv_nnc_mfa_add_params_t params = {
+				.args = 2,
 				.data_type = mtl_data_type,
 				.length = (uint32_t)length,
 			};

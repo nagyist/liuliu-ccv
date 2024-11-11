@@ -6,6 +6,7 @@
 bool AddDescriptor::operator==(const AddDescriptor& rhs) const {
   return
   memoryPrecision == rhs.memoryPrecision &&
+  args == rhs.args &&
   value == rhs.value &&
   length == rhs.length;
 }
@@ -14,7 +15,7 @@ std::size_t std::hash<AddDescriptor>::operator()(const AddDescriptor& hash) cons
   using namespace ccv::nnc::mfa::hash;
   std::size_t seed = 0;
   combine_64(seed, pack_64(simd::uint2 { (unsigned int)hash.memoryPrecision.value, (unsigned int)hash.value }));
-  combine_64(seed, pack_64(simd::uint2 { (unsigned int)hash.length, 0 }));
+  combine_64(seed, pack_64(simd::uint2 { (unsigned int)hash.length, (unsigned int)hash.args }));
   return seed;
 }
 
@@ -35,6 +36,7 @@ std::pair<AddKernelDescriptor, PipelineValue<AddKernel> *> AddDescriptor::findKe
   };
 
   AddKernelDescriptor kernelDesc;
+  kernelDesc.args = args;
   kernelDesc.value = value;
   kernelDesc.memoryPrecision = memoryPrecision;
 

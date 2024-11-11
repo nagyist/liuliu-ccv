@@ -23,9 +23,10 @@ void ccv_nnc_mfa_encode_add(ccv_nnc_mfa_context_t* context, ccv_nnc_mfa_add_para
     encoder->setBuffer(tensors[num_tensors], tensor_offsets[num_tensors], NS::UInteger(num_tensors));
     num_tensors += 1;
   }
-  CCV_NNC_MFA_PRECONDITION(num_tensors == 3);
+  CCV_NNC_MFA_PRECONDITION(num_tensors == 1 + params.args);
 
   AddDescriptor descriptor;
+  descriptor.args = params.args;
   descriptor.memoryPrecision = (params.data_type == MTL::DataTypeFloat) ? GEMMOperandPrecision::FP32 : GEMMOperandPrecision::FP16;
   descriptor.length = params.length;
 
@@ -47,16 +48,18 @@ void ccv_nnc_mfa_encode_add(ccv_nnc_mfa_context_t* context, ccv_nnc_mfa_add_para
 
   encoder->setComputePipelineState(pipeline.get());
   
-  if (tensors[0] == tensors[2]) {
-    encoder->useResource(tensors[0], MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
-    encoder->useResource(tensors[1], MTL::ResourceUsageRead);
-  } else if (tensors[1] == tensors[2]) {
-    encoder->useResource(tensors[0], MTL::ResourceUsageRead);
-    encoder->useResource(tensors[1], MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
-  } else {
-    encoder->useResource(tensors[0], MTL::ResourceUsageRead);
-    encoder->useResource(tensors[1], MTL::ResourceUsageRead);
-    encoder->useResource(tensors[2], MTL::ResourceUsageWrite);
+  int i;
+  int flag = 0;
+  for (i = 0; i < params.args; i++) {
+    if (tensors[i] == tensors[params.args]) {
+      encoder->useResource(tensors[i], MTL::ResourceUsageRead | MTL::ResourceUsageWrite);
+      flag = 1;
+	} else {
+      encoder->useResource(tensors[i], MTL::ResourceUsageRead);
+	}
+  }
+  if (!flag) {
+    encoder->useResource(tensors[params.args], MTL::ResourceUsageWrite);
   }
 
   unsigned int count;

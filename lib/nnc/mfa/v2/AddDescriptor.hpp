@@ -8,9 +8,10 @@
 #include "GEMMOperandPrecision.hpp"
 
 struct AddKernelDescriptor {
+  uint8_t args;
   uint8_t value;
   GEMMOperandPrecision memoryPrecision;
-  constexpr bool operator==(const AddKernelDescriptor &rhs) const { return value == rhs.value && memoryPrecision == rhs.memoryPrecision; }
+  constexpr bool operator==(const AddKernelDescriptor &rhs) const { return args == rhs.args && value == rhs.value && memoryPrecision == rhs.memoryPrecision; }
 };
 
 template<>
@@ -22,6 +23,8 @@ struct std::hash<AddKernelDescriptor>
 struct AddKernel;
 
 struct AddDescriptor {
+  uint8_t args;
+
   uint8_t value;
 
   GEMMOperandPrecision memoryPrecision;

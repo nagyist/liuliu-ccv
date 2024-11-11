@@ -3,6 +3,7 @@
 
 typedef struct {
   uint64_t data_type;
+  uint8_t args;
   uint32_t length;
 } ccv_nnc_mfa_add_params_t;
 
