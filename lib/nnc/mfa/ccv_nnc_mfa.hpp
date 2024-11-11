@@ -54,7 +54,6 @@ public:
   cache<depalettize::hash, depalettize::pipeline> depalettize_cache;
   cache<adam::hash, adam::pipeline> adam_cache;
   cache<gemv::hash, gemv::pipeline> gemv_cache;
-  cache<cast::hash, cast::pipeline> cast_cache;
   cache<add::hash, add::pipeline> add_cache;
 
   ShaderCache v2_cache;

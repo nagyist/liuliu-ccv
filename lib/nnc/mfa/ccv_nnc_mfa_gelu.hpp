@@ -9,41 +9,6 @@ typedef struct {
 } ccv_nnc_mfa_gelu_params_t;
 
 #ifdef __cplusplus
-#include "nnc/mfa/3rdparty/metal-cpp/Dispatch.hpp"
-#include "nnc/mfa/3rdparty/metal-cpp/Metal.hpp"
-#include <simd/simd.h>
-
-namespace ccv {
-namespace nnc {
-namespace mfa {
-namespace gelu {
-
-class hash {
-public:
-  uint64_t data_type;
-  uint32_t astride[3];
-  uint32_t bstride[3];
-  uint32_t cstride[3];
-  uint32_t dim[4];
-
-  hash(ccv_nnc_mfa_gelu_params_t);
-};
-
-class pipeline {
-public:
-  NS::SharedPtr<MTL::ComputePipelineState> gelu_pso;
-  
-  MTL::Size grid_size;
-  MTL::Size group_size;
-  
-  pipeline(context* context, hash hash);
-};
-
-} // namespace gelu
-} // namespace mfa
-} // namespace nnc
-} // namespace ccv
-
 extern "C" {
 #endif // __cplusplus
 
