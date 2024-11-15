@@ -445,8 +445,9 @@ static inline void ccv_cnnp_model_add_to_parameter_indices(ccv_cnnp_model_t* con
 }
 
 typedef struct {
-	ccv_cnnp_model_sequence_t* sequence;
+	uint8_t add_parameter_indices;
 	char prefix;
+	ccv_cnnp_model_sequence_t* sequence;
 	ccv_array_t* symbols;
 	ccv_array_t* ids;
 	ccv_array_t* trainables;

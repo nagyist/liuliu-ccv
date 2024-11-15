@@ -309,15 +309,17 @@ void ccv_cnnp_model_apply_gradient_checkpoints(ccv_cnnp_compiled_data_t* const c
 			.bank = kh_init(ccv_cnnp_model_name_bank)
 		};
 		ccv_cnnp_model_add_to_array_context_t add_to_parameter_context = {
-			.sequence = &model_sequence,
+			.add_parameter_indices = 0,
 			.prefix = 't',
+			.sequence = &model_sequence,
 			.symbols = parameters,
 			.ids = parameter_ids,
 			.trainables = parameter_trainables,
 		};
 		ccv_cnnp_model_add_to_array_context_t add_to_output_context = {
-			.sequence = &model_sequence,
+			.add_parameter_indices = 0,
 			.prefix = 'r',
+			.sequence = &model_sequence,
 			.symbols = internals,
 			.ids = internal_ids,
 			.trainables = 0,

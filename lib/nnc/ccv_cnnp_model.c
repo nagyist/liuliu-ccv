@@ -133,7 +133,7 @@ void ccv_cnnp_model_add_to_array(void* const context, const ccv_nnc_tensor_symbo
 	ccv_cnnp_model_add_to_array_context_t* const add_to_array_context = (ccv_cnnp_model_add_to_array_context_t*)context;
 	ccv_cnnp_model_t* const model = add_to_array_context->sequence->model;
 	int i;
-	if (!model->parameter_indices)
+	if (add_to_array_context->add_parameter_indices && !model->parameter_indices)
 		model->parameter_indices = ccv_array_new(sizeof(int), 0, 0);
 	for (i = 0; i < add_to_array_context->symbols->rnum; i++)
 	{
@@ -141,14 +141,14 @@ void ccv_cnnp_model_add_to_array(void* const context, const ccv_nnc_tensor_symbo
 		if (other_symbol.d == symbol.d && other_symbol.graph == symbol.graph)
 		{
 			// Only add to parameter_indices if it is trainable.
-			if (add_to_array_context->prefix == 't')
+			if (add_to_array_context->add_parameter_indices)
 				ccv_array_add_unique_int(model->parameter_indices, i);
 			// Found it, return, don't add it.
 			return;
 		}
 	}
 	// Only add to parameter_indices if it is trainable.
-	if (add_to_array_context->prefix == 't')
+	if (add_to_array_context->add_parameter_indices)
 		ccv_array_push(model->parameter_indices, &add_to_array_context->symbols->rnum);
 	// This is a new one, no need to add_unique_int, it is unique.
 	ccv_array_push(add_to_array_context->symbols, &symbol);
@@ -202,8 +202,9 @@ static void _ccv_cnnp_model_compile(ccv_cnnp_model_t* const model, const ccv_nnc
 		.bank = kh_init(ccv_cnnp_model_name_bank)
 	};
 	ccv_cnnp_model_add_to_array_context_t add_to_parameter_context = {
-		.sequence = &model_sequence,
+		.add_parameter_indices = 1,
 		.prefix = 't',
+		.sequence = &model_sequence,
 		.symbols = parameters,
 		.ids = parameter_ids,
 		.trainables = parameter_trainables,
@@ -211,8 +212,9 @@ static void _ccv_cnnp_model_compile(ccv_cnnp_model_t* const model, const ccv_nnc
 	ccv_array_t* const internals = ccv_array_new(sizeof(ccv_nnc_tensor_symbol_t), 0, 0);
 	ccv_array_t* const internal_ids = ccv_array_new(sizeof(char*), 0, 0);
 	ccv_cnnp_model_add_to_array_context_t add_to_output_context = {
-		.sequence = &model_sequence,
+		.add_parameter_indices = 0,
 		.prefix = 'r',
+		.sequence = &model_sequence,
 		.symbols = internals,
 		.ids = internal_ids,
 		.trainables = 0,
