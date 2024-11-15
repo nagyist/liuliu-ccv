@@ -29,6 +29,14 @@ static int _ccv_nnc_ewsum_forw(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hin
 		}
 
 		if (use_mfa) {
+			if (input_size > 8) // Should be 31 or 16 maximum. We just be safe here.
+			{
+				use_mfa = false;
+				fallback_reason = "Too many argument buffers.";
+			}
+		}
+
+		if (use_mfa) {
 			for (z = 0; z < input_size; z++)
 			{
 				if (inputs[z]->info.datatype != CCV_16F && inputs[z]->info.datatype != CCV_32F) {
