@@ -895,6 +895,15 @@ void ccv_nnc_set_queue_watermark(int state);
  */
 CCV_WARN_UNUSED(int) ccv_nnc_queue_watermark(void);
 /**
+ * Set the device mapping to use custom order for device rather than driver imposed order. This is helpful
+ * to manage code where which GPU to use have no control over. The previous permutation is cleared up on
+ * each call and you can set 0 size device map to clear up all custom mapping.
+ * @param type Currently, only CCV_NNC_STREAM_CONTEXT_GPU on NVIDIA systems are supported.
+ * @param device_map The array of device map, maximum 64 devices.
+ * @param size The size of the array, only first 64 will be used.
+ */
+void ccv_nnc_set_device_permutation(const int type, const int* const device_map, const int size);
+/**
  * Quantize a given memory region of a given datatype / memory resides, into nbits palette.
  * @param input The input memory region, it can be CCV_64F, CCV_32F or CCV_16F.
  * @param datatype The datatype, it can be CCV_64F, CCV_32F or CCV_16F.
@@ -1073,14 +1082,6 @@ void ccv_nnc_stream_signal_free(ccv_nnc_stream_signal_t* const signal);
  * @return The number of devices.
  */
 CCV_WARN_UNUSED(int) ccv_nnc_device_count(const int type);
-/**
- * Remap a source device as the destination device.
- * @param type The type of devices (CCV_NNC_STREAM_CONTEXT_GPU / CCV_NNC_STREAM_CONTEXT_CPU)
- * @param source The original device id.
- * @param destination The new device id.
- * @return 0 if the device remap is successful, -1 if it is not.
- */
-CCV_WARN_UNUSED(int) ccv_nnc_device_remap(const int type, const int source, const int destination);
 /**
  * The neighbor discovery function that will be called with the device id.
  */

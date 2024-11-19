@@ -33,6 +33,7 @@ typedef void(*cump_f)(int device_id, void* const context);
 int curegmp(int device_id, cump_f func, void* const context); // register memory pressure handler
 void cuunregmp(const int id); // un-register memory pressure handler.
 void cusetprofiler(int state);
+void cusetdevicemap(const int* const device_map, const int size);
 
 // Stream context
 CCV_WARN_UNUSED(ccv_nnc_stream_context_t*) ccv_nnc_init_stream_context(ccv_nnc_stream_context_t* const stream_context);

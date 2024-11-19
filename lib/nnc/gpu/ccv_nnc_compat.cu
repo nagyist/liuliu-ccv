@@ -6,6 +6,7 @@ extern "C" {
 }
 
 static void cutrigmp(void);
+static int cudevicemap(const int device_id);
 
 #ifdef HAVE_CUDNN
 struct cudnn_free_list_s {
@@ -16,8 +17,10 @@ KHASH_MAP_INIT_INT(cudnn_free, struct cudnn_free_list_s*);
 static pthread_mutex_t g_cudnn_mutex = PTHREAD_MUTEX_INITIALIZER;
 static khash_t(cudnn_free)* g_cudnn = 0;
 
-cudnnHandle_t cudnn_get(const int type)
+static cudnnHandle_t cudnn_get(int type)
 {
+	const int device_id = cudevicemap(CCV_STREAM_GET_DEVICE_ID(type));
+	CCV_STREAM_SET_DEVICE_ID(type, device_id);
 	pthread_mutex_lock(&g_cudnn_mutex);
 	if (!g_cudnn)
 		g_cudnn = kh_init(cudnn_free);
@@ -45,8 +48,10 @@ cudnnHandle_t cudnn_get(const int type)
 	return cudnn;
 }
 
-void cudnn_save(const int type, cudnnHandle_t cudnn)
+static void cudnn_save(int type, cudnnHandle_t cudnn)
 {
+	const int device_id = cudevicemap(CCV_STREAM_GET_DEVICE_ID(type));
+	CCV_STREAM_SET_DEVICE_ID(type, device_id);
 	pthread_mutex_lock(&g_cudnn_mutex);
 	int ret;
 	khiter_t i = kh_put(cudnn_free, g_cudnn, type, &ret);
@@ -57,7 +62,7 @@ void cudnn_save(const int type, cudnnHandle_t cudnn)
 	pthread_mutex_unlock(&g_cudnn_mutex);
 }
 
-void cudnn_pressure(const int device_id)
+static void cudnn_pressure(const int device_id)
 {
 	pthread_mutex_lock(&g_cudnn_mutex);
 	if (g_cudnn)
@@ -160,6 +165,54 @@ void cuunregmp(const int slot)
 	pthread_mutex_unlock(&g_mp_mutex);
 }
 
+static int cuda_device_map[64] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
+};
+
+static int cuda_device_reverse_map[64] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
+};
+
+void cusetdevicemap(const int* const device_map, const int size)
+{
+	int i;
+	for (i = 0; i < sizeof(cuda_device_reverse_map) / sizeof(cuda_device_reverse_map[0]); i++)
+		cuda_device_reverse_map[i] = -1;
+	for (i = size; i < sizeof(cuda_device_map) / sizeof(cuda_device_map[0]); i++)
+		cuda_device_map[i] = -1;
+	for (i = 0; i < ccv_min(sizeof(cuda_device_map) / sizeof(cuda_device_map[0]), size); i++)
+	{
+		cuda_device_map[i] = device_map[i];
+		cuda_device_reverse_map[device_map[i]] = i;
+	}
+}
+
+static int cudevicemap(const int device_id)
+{
+	if (device_id >= sizeof(cuda_device_map) / sizeof(cuda_device_map[0]))
+		return device_id;
+	const int new_device_id = cuda_device_map[device_id];
+	if (new_device_id < 0)
+		return device_id;
+	return new_device_id;
+}
+
+static int cudevicereversemap(const int device_id)
+{
+	if (device_id >= sizeof(cuda_device_reverse_map) / sizeof(cuda_device_reverse_map[0]))
+		return device_id;
+	const int new_device_id = cuda_device_reverse_map[device_id];
+	if (new_device_id < 0)
+		return device_id;
+	return new_device_id;
+}
+
 static void cutrigmp(void)
 {
 	int device_id;
@@ -170,7 +223,7 @@ static void cutrigmp(void)
 	{
 		cump_t* const mp = (cump_t*)ccv_array_get(g_mp_h, i);
 		if (mp->device_id == device_id && mp->func)
-			mp->func(device_id, mp->ctx);
+			mp->func(cudevicereversemap(device_id), mp->ctx);
 	}
 	pthread_mutex_unlock(&g_mp_mutex);
 	// Set back the device id.
@@ -183,7 +236,7 @@ static void cutrigmp(void)
 void* cumalloc(int device, size_t size)
 {
 	void* ptr = 0;
-	CUDA_ENFORCE(cudaSetDevice(device));
+	CUDA_ENFORCE(cudaSetDevice(cudevicemap(device)));
 	cudaMalloc(&ptr, size);
 	if (ptr == 0)
 	{
@@ -195,14 +248,14 @@ void* cumalloc(int device, size_t size)
 
 void cufree(int device, void* ptr)
 {
-	CUDA_ENFORCE(cudaSetDevice(device));
+	CUDA_ENFORCE(cudaSetDevice(cudevicemap(device)));
 	CUDA_ENFORCE(cudaFree(ptr));
 }
 
 void cudevice(int device)
 {
 	if (device >= 0)
-		CUDA_ENFORCE(cudaSetDevice(device));
+		CUDA_ENFORCE(cudaSetDevice(cudevicemap(device)));
 }
 
 void cumemcpy(void* dest, const int dest_type, const void* src, const int src_type, size_t n)
@@ -211,18 +264,18 @@ void cumemcpy(void* dest, const int dest_type, const void* src, const int src_ty
 		return;
 	if (CCV_TENSOR_GET_MEMORY(src_type) == CCV_TENSOR_CPU_MEMORY && CCV_TENSOR_GET_MEMORY(dest_type) == CCV_TENSOR_GPU_MEMORY) {
 		const int device_b = CCV_TENSOR_GET_DEVICE_ID(dest_type);
-		CUDA_ENFORCE(cudaSetDevice(device_b));
+		CUDA_ENFORCE(cudaSetDevice(cudevicemap(device_b)));
 		CUDA_ENFORCE(cudaMemcpy(dest, src, n, cudaMemcpyHostToDevice));
 	} else if (CCV_TENSOR_GET_MEMORY(src_type) == CCV_TENSOR_GPU_MEMORY && CCV_TENSOR_GET_MEMORY(dest_type) == CCV_TENSOR_CPU_MEMORY) {
 		const int device_a = CCV_TENSOR_GET_DEVICE_ID(src_type);
-		CUDA_ENFORCE(cudaSetDevice(device_a));
+		CUDA_ENFORCE(cudaSetDevice(cudevicemap(device_a)));
 		CUDA_ENFORCE(cudaMemcpy(dest, src, n, cudaMemcpyDeviceToHost));
 	} else if (CCV_TENSOR_GET_MEMORY(src_type) == CCV_TENSOR_CPU_MEMORY && CCV_TENSOR_GET_MEMORY(dest_type) == CCV_TENSOR_CPU_MEMORY)
 		CUDA_ENFORCE(cudaMemcpy(dest, src, n, cudaMemcpyHostToHost));
 	else if (CCV_TENSOR_GET_MEMORY(src_type) == CCV_TENSOR_GPU_MEMORY && CCV_TENSOR_GET_MEMORY(dest_type) == CCV_TENSOR_GPU_MEMORY) {
 		const int device_a = CCV_TENSOR_GET_DEVICE_ID(src_type);
 		const int device_b = CCV_TENSOR_GET_DEVICE_ID(dest_type);
-		CUDA_ENFORCE(cudaSetDevice(device_b));
+		CUDA_ENFORCE(cudaSetDevice(cudevicemap(device_b)));
 		if (device_a == device_b)
 			CUDA_ENFORCE(cudaMemcpy(dest, src, n, cudaMemcpyDeviceToDevice));
 		else
@@ -334,7 +387,7 @@ static ccv_nnc_stream_context_device_local_t* _ccv_nnc_stream_compat_device_loca
 		}
 		return stream_compat->_heap_gpus + device_id;
 	} else {
-		CUDA_ENFORCE(cudaSetDevice(device_id));
+		CUDA_ENFORCE(cudaSetDevice(cudevicemap(device_id)));
 		return &stream_compat->_inline_gpu;
 	}
 }
@@ -359,7 +412,7 @@ ccv_nnc_stream_signal_t* ccv_nnc_init_stream_signal(ccv_nnc_stream_signal_t* con
 	assert(CCV_STREAM_GET_CONTEXT(((int*)signal)[0]) == CCV_STREAM_CONTEXT_GPU);
 	ccv_nnc_stream_compat_signal_t* compat_signal = (ccv_nnc_stream_compat_signal_t*)ccrealloc(signal, sizeof(ccv_nnc_stream_compat_signal_t));
 	const int device = CCV_STREAM_GET_DEVICE_ID(compat_signal->super.type);
-	CUDA_ENFORCE(cudaSetDevice(device));
+	CUDA_ENFORCE(cudaSetDevice(cudevicemap(device)));
 	CUDA_ENFORCE(cudaEventCreateWithFlags(&compat_signal->event, cudaEventDisableTiming));
 	return (ccv_nnc_stream_signal_t*)compat_signal;
 }
@@ -388,7 +441,7 @@ void ccv_nnc_deinit_stream_signal(ccv_nnc_stream_signal_t* const signal)
 {
 	ccv_nnc_stream_compat_signal_t* compat_signal = (ccv_nnc_stream_compat_signal_t*)signal;
 	const int device = CCV_STREAM_GET_DEVICE_ID(compat_signal->super.type);
-	CUDA_ENFORCE(cudaSetDevice(device));
+	CUDA_ENFORCE(cudaSetDevice(cudevicemap(device)));
 	CUDA_ENFORCE(cudaEventDestroy(compat_signal->event));
 }
 
@@ -458,6 +511,7 @@ void* ccv_nnc_stream_compat_get_workspace(const ccv_nnc_stream_context_t* const 
 			return device_local->workspace;
 		int device_id;
 		CUDA_ENFORCE(cudaGetDevice(&device_id));
+		device_id = cudevicereversemap(device_id);
 		device_local->workspace_size = workspace_size;
 		if (device_local->workspace)
 			CUDA_ENFORCE(cudaFree(device_local->workspace));
@@ -494,7 +548,7 @@ void ccv_nnc_stream_compat_drain(ccv_nnc_stream_context_t* const stream_context)
 				stream_compat->_heap_gpus[i].workspace_size = 0;
 			}
 	} else if (stream_compat->_inline_gpu.workspace) {
-		CUDA_ENFORCE(cudaSetDevice(device));
+		CUDA_ENFORCE(cudaSetDevice(cudevicemap(device)));
 		CUDA_ENFORCE(cudaFree(stream_compat->_inline_gpu.workspace));
 		stream_compat->_inline_gpu.workspace = 0;
 		stream_compat->_inline_gpu.workspace_size = 0;
@@ -613,7 +667,7 @@ void ccv_nnc_deinit_stream_context(ccv_nnc_stream_context_t* const stream_contex
 					cuunregmp(stream_compat->_heap_gpus[i].mp_hook - 1);
 			}
 	} else {
-		CUDA_ENFORCE(cudaSetDevice(device));
+		CUDA_ENFORCE(cudaSetDevice(cudevicemap(device)));
 		if (stream_compat->_inline_gpu.workspace)
 		{
 			CUDA_ENFORCE(cudaFree(stream_compat->_inline_gpu.workspace));
@@ -657,6 +711,7 @@ int ccv_nnc_stream_context_get_device(const ccv_nnc_stream_context_t* const stre
 	{
 		int device = 0;
 		CUDA_ENFORCE(cudaGetDevice(&device));
+		device = cudevicereversemap(device);
 		return device;
 	}
 	const ccv_nnc_stream_context_compat_t* stream_compat = (const ccv_nnc_stream_context_compat_t*)stream_context;
@@ -838,6 +893,7 @@ cudnnHandle_t ccv_nnc_stream_context_get_cudnn(const ccv_nnc_stream_context_t* c
 		{
 			int device_id;
 			CUDA_ENFORCE(cudaGetDevice(&device_id));
+			device_id = cudevicereversemap(device_id);
 			device_local->mp_hook = curegmp(device_id, _ccv_nnc_device_local_drain, device_local) + 1;
 		}
 	}
@@ -1440,14 +1496,14 @@ ncclComm_t ccv_nnc_nccl_get_comm(ccv_nnc_stream_context_t* const stream, const i
 			stream_compat->super.resource_container[0] = (ccv_nnc_stream_resource_container_t*)cccalloc(1, sizeof(ccv_nnc_stream_resource_container_compat_t));
 		ccv_nnc_stream_resource_container_compat_t* const resource_container_compat = (ccv_nnc_stream_resource_container_compat_t*)stream_compat->super.resource_container[0];
 		if (resource_container_compat->comms && resource_container_compat->comm_count == device_count)
-			return resource_container_compat->comms[device_id];
+			return resource_container_compat->comms[cudevicemap(device_id)];
 		if (resource_container_compat->comms)
 			resource_container_compat->comms = (ncclComm_t*)ccrealloc(resource_container_compat->comms, sizeof(ncclComm_t) * device_count);
 		else
 			resource_container_compat->comms = (ncclComm_t*)ccmalloc(sizeof(ncclComm_t) * device_count);
 		_ccv_nnc_nccl_redo_comms(resource_container_compat->comms, resource_container_compat->comm_count, device_count);
 		resource_container_compat->comm_count = device_count;
-		return resource_container_compat->comms[device_id];
+		return resource_container_compat->comms[cudevicemap(device_id)];
 	} else {
 		static ncclComm_t comms[CCV_TENSOR_GET_DEVICE_ID(CCV_COMPUTE_DEVICE_ANY)];
 		static int comm_count = 0;
@@ -1456,7 +1512,7 @@ ncclComm_t ccv_nnc_nccl_get_comm(ccv_nnc_stream_context_t* const stream, const i
 			_ccv_nnc_nccl_redo_comms(comms, comm_count, device_count);
 			comm_count = device_count;
 		}
-		return comms[device_id];
+		return comms[cudevicemap(device_id)];
 	}
 }
 

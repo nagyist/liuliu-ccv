@@ -730,3 +730,12 @@ void ccv_nnc_set_queue_watermark(int watermark)
 	ccv_nnc_mps_set_queue_watermark(watermark);
 #endif
 }
+
+void ccv_nnc_set_device_permutation(const int type, const int* const device_map, const int size)
+{
+	if (type != CCV_STREAM_CONTEXT_GPU)
+		return;
+#ifdef HAVE_CUDA
+	cusetdevicemap(device_map, size);
+#endif
+}
