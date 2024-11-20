@@ -1,4 +1,5 @@
 #include "ccv_nnc_compat.h"
+#include <cufile.h> // For GPUDirect Storage
 extern "C" {
 #include <nnc/ccv_nnc_easy.h>
 #include <nnc/_ccv_nnc_stream.h>
@@ -303,6 +304,21 @@ int curegister(void* ptr, size_t size)
 void cuunregister(void* ptr)
 {
 	CUDA_ENFORCE(cudaHostUnregister(ptr));
+}
+
+void cufileread(const int fd, const off_t file_offset, void* const buf, const size_t size)
+{
+	CUfileDescr_t file_descr = {
+		.type = CU_FILE_HANDLE_TYPE_OPAQUE_FD,
+		.handle = {
+			.fd = fd,
+		},
+		.fs_ops = 0,
+	};
+	CUfileHandle_t file_handle;
+	CUFILE_ENFORCE(cuFileHandleRegister(&file_handle, &file_descr));
+	cuFileRead(file_handle, buf, size, file_offset, 0);
+	cuFileHandleDeregister(file_handle);
 }
 
 typedef struct {

@@ -132,11 +132,8 @@ ccv_nnc_tensor_t* ccv_nnc_tensor_new_from_file(const ccv_nnc_tensor_param_t para
 			// This is not supported yet on CUDA.
 			tensor->data.u8 = (uint8_t*)cumalloc(CCV_TENSOR_GET_DEVICE_ID(params.type), size);
 			int fd = open(filename, O_RDONLY, 0);
-			void* bufptr = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, offset);
+			cufileread(fd, offset, tensor->data.u8, size);
 			close(fd);
-			madvise(bufptr, size, MADV_SEQUENTIAL | MADV_WILLNEED);
-			cumemcpy(tensor->data.u8, CCV_TENSOR_GPU_MEMORY, bufptr, CCV_TENSOR_CPU_MEMORY, size);
-			munmap(bufptr, size);
 		} else
 			tensor->data.u8 = 0;
 	} else {

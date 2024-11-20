@@ -34,6 +34,7 @@ int curegmp(int device_id, cump_f func, void* const context); // register memory
 void cuunregmp(const int id); // un-register memory pressure handler.
 void cusetprofiler(int state);
 void cusetdevicemap(const int* const device_map, const int size);
+void cufileread(const int fd, const off_t file_offset, void* const buf, const size_t size);
 
 // Stream context
 CCV_WARN_UNUSED(ccv_nnc_stream_context_t*) ccv_nnc_init_stream_context(ccv_nnc_stream_context_t* const stream_context);
@@ -117,6 +118,20 @@ CCV_WARN_UNUSED(size_t) ccv_nnc_cublas_workspace_size_in_bytes(const ccv_nnc_ten
 		assert(0);                                              \
 		exit(EXIT_FAILURE);                                     \
 	}                                                           \
+} while (0)
+#endif
+
+#ifdef NDEBUG
+#define CUFILE_ENFORCE(status) status
+#else
+#define CUFILE_ENFORCE(status) do {                               \
+	const CUfileError_t __status = status;                        \
+	if (__status.err != CU_FILE_SUCCESS) {                        \
+		printf("[%s:%d]:CUDA - Error: %s\n",                      \
+				__FILE__, __LINE__, CUFILE_ERRSTR(__status.err)); \
+		assert(0);                                                \
+		exit(EXIT_FAILURE);                                       \
+	}                                                             \
 } while (0)
 #endif
 
