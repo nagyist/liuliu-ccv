@@ -226,7 +226,7 @@ static int _ccv_nnc_scaled_dot_product_attention_forw(const ccv_nnc_cmd_t cmd, c
 
 			const int b_nd = ccv_nnc_tensor_nd(weights->info.dim);
 			assert(b_nd == 2);
-			assert(CCV_IS_TENSOR_CONTIGUOUS(bias));
+			assert(CCV_IS_TENSOR_CONTIGUOUS(c));
 			const int c_nd = ccv_nnc_tensor_nd(c->info.dim);
 			assert(c_nd == 3);
 
