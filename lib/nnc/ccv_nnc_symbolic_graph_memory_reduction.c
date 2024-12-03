@@ -13,52 +13,126 @@ static void _ccv_nnc_remove_unused_from_marked(const uint32_t* const tensor_used
 		tensor_marked[i] &= tensor_used[i];
 }
 
-static ccv_sparse_matrix_t* _ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_graph_visit_t* const visit)
+typedef struct {
+	int* chain_ids;
+	int* chain_pos;
+	ccv_sparse_matrix_t* deps;
+} ccv_nnc_exec_dep_t;
+
+// Implement the new method for exec_dep. We use chain decomposition such that each node only needs to log which chain and at which node to be dependent on.
+static ccv_nnc_exec_dep_t _ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_graph_visit_t* const visit, const ccv_nnc_graph_visit_t* const reversed_visit)
 {
-	ccv_sparse_matrix_t* exec_dep = ccv_sparse_matrix_new(graph->exec_symbol_info->rnum, graph->exec_symbol_info->rnum, CCV_32S | CCV_C1, CCV_SPARSE_ROW_MAJOR, 0);
-	int* buf = (int*)ccmalloc(sizeof(int) * graph->exec_symbol_info->rnum * 2);
-	int buf_size;
+	const int exec_symbol_info_size = graph->exec_symbol_info->rnum;
+	int* chain_ids = ccmalloc(sizeof(int) * exec_symbol_info_size * 2);
+	int* chain_pos = chain_ids + exec_symbol_info_size;
+	int* buf = (int*)ccmalloc(sizeof(int) * exec_symbol_info_size * 3);
+	int* reversed_depth = buf;
+	const ccv_nnc_graph_exec_symbol_info_t* const exec_symbol_info = (ccv_nnc_graph_exec_symbol_info_t*)ccv_array_get(graph->exec_symbol_info, 0);
+	int i, j;
+	// Go reverse order to generate the distance from sink.
+	ccv_nnc_graph_visit_for(reversed_visit, exec_symbol_info, node, idx, term) {
+		chain_ids[idx] = -1;
+		if (!node->outgoings || node->outgoings->rnum == 0)
+		{
+			reversed_depth[idx] = 0;
+			continue;
+		}
+		const int outgoing = *(int*)ccv_array_get(node->outgoings, 0);
+		int depth = reversed_depth[outgoing];
+		for (i = 1; i < node->outgoings->rnum; i++)
+		{
+			const int outgoing = *(int*)ccv_array_get(node->outgoings, i);
+			depth = ccv_max(depth, reversed_depth[outgoing]);
+		}
+		reversed_depth[idx] = depth + 1;
+	} ccv_nnc_graph_visit_endfor
+	// Go in order to generate chain ids (if there are multiple exits, we use the reverse depth to break the tie).
+	// Note that we cannot use depth so-far because then multiple exit nodes are equally good to "inherit" the chain selection.
+	int chain_count = 0;
+	ccv_nnc_graph_visit_for(visit, exec_symbol_info, node, idx, term) {
+		int chain_id = chain_ids[idx];
+		if (chain_ids[idx] < 0)
+		{
+			chain_id = chain_count;
+			chain_ids[idx] = chain_id;
+			chain_pos[idx] = 1; // The first one in this chain. 1-based index because in sparse matrix, 0 is the default value.
+			chain_count += 1;
+		}
+		if (!node->outgoings || node->outgoings->rnum == 0)
+			continue;
+		int depth = 0;
+		int next_idx = -1;
+		for (i = 0; i < node->outgoings->rnum; i++)
+		{
+			const int outgoing = *(int*)ccv_array_get(node->outgoings, i);
+			if (chain_ids[outgoing] < 0 && reversed_depth[outgoing] > depth)
+				depth = reversed_depth[outgoing], next_idx = outgoing;
+		}
+		if (next_idx >= 0)
+		{
+			chain_ids[next_idx] = chain_id;
+			chain_pos[next_idx] = chain_pos[idx] + 1;
+		}
+	} ccv_nnc_graph_visit_endfor
+	ccv_sparse_matrix_t* deps = ccv_sparse_matrix_new(graph->exec_symbol_info->rnum, chain_count, CCV_32S | CCV_C2, CCV_SPARSE_ROW_MAJOR, 0);
+	// It logs which pos on that chain we depend on. We can simply compare that with the chain_pos for a node to know if they are ancestors.
 #define for_block(x, val) \
 	do { \
 		if (((int32_t*)val)[0] > 0) \
 		{ \
-			buf[buf_size * 2] = x; \
-			buf[buf_size * 2 + 1] = ((int32_t*)val)[0] + 1; \
+			buf[buf_size * 3] = x; \
+			buf[buf_size * 3 + 1] = ((int32_t*)val)[0]; \
+			buf[buf_size * 3 + 2] = ((int32_t*)val)[1] + 1; \
 			++buf_size; \
 		} \
 	} while (0)
-	const ccv_nnc_graph_exec_symbol_info_t* const exec_symbol_info = (ccv_nnc_graph_exec_symbol_info_t*)ccv_array_get(graph->exec_symbol_info, 0);
-	int i, j;
+	int buf_size;
 	ccv_nnc_graph_visit_for(visit, exec_symbol_info, node, idx, term) {
 		buf_size = 0; /* save all its parent deps to this buffer */
-		ccv_sparse_matrix_vector_t* vector = ccv_get_sparse_matrix_vector(exec_dep, idx);
+		ccv_sparse_matrix_vector_t* vector = ccv_get_sparse_matrix_vector(deps, idx);
 		if (vector)
-			CCV_SPARSE_VECTOR_FOREACH(exec_dep, vector, for_block);
+			CCV_SPARSE_VECTOR_FOREACH(deps, vector, for_block);
 		if (!node->outgoings)
 			continue;
+		const int chain_id = chain_ids[idx];
+		const int pos = chain_pos[idx];
 		for (i = 0; i < node->outgoings->rnum; i++)
 		{
 			const int outgoing = *(int*)ccv_array_get(node->outgoings, i);
-			const int32_t one = 1;
-			ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell(exec_dep, outgoing, idx);
-			/* If not found, set, if the current node is the destination node, no need 
-			 * set itself as parent of subsequent nodes because its terminal nature. */
-			if (!cell.i32 || cell.i32[0] == 0)
-				ccv_set_sparse_matrix_cell(exec_dep, outgoing, idx, &one);
+			const int outgoing_chain_id = chain_ids[outgoing];
+			if (outgoing_chain_id != chain_id)
+			{
+				ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell(deps, outgoing, chain_id);
+				/* If not found, set, if the current node is the destination node, no need 
+				 * set itself as parent of subsequent nodes because its terminal nature. */
+				if (!cell.i32 || cell.i32[0] == 0 || cell.i32[0] < pos)
+				{
+					int p[2] = { pos, 1 };
+					ccv_set_sparse_matrix_cell(deps, outgoing, chain_id, &p);
+				}
+			}
 			if (buf_size > 0)
 			{
-				ccv_sparse_matrix_vector_t* vector = ccv_get_sparse_matrix_vector(exec_dep, outgoing);
-				assert(vector);
+				ccv_sparse_matrix_vector_t* vector = ccv_get_sparse_matrix_vector(deps, outgoing);
 				for (j = 0; j < buf_size; j++) /* set with all idx's dependencies as well */
 				{
-					ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell_from_vector(exec_dep, vector, buf[j * 2]);
-					/* If not found, set */
-					if (!cell.i32 || cell.i32[0] == 0)
-						ccv_set_sparse_matrix_cell_from_vector(exec_dep, vector, buf[j * 2], &buf[j * 2 + 1]);
-					else {
-						/* Otherwise, set to the longest one */
-						int32_t dep = ccv_max(cell.i32[0], buf[j * 2 + 1]);
-						ccv_set_sparse_matrix_cell_from_vector(exec_dep, vector, buf[j * 2], &dep);
+					if (outgoing_chain_id == buf[j * 3]) // We don't need to add as dependency for the same chain.
+						continue;
+					if (!vector)
+					{
+						ccv_set_sparse_matrix_cell(deps, outgoing, buf[j * 3], &buf[j * 3 + 1]);
+						vector = ccv_get_sparse_matrix_vector(deps, outgoing);
+						continue;
+					}
+					ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell_from_vector(deps, vector, buf[j * 3]);
+					/* If not found, set. Otherwise, set to the latest one only if it is later. */
+					if (!cell.i32)
+						ccv_set_sparse_matrix_cell_from_vector(deps, vector, buf[j * 3], &buf[j * 3 + 1]);
+					else if (cell.i32[0] == 0 || cell.i32[0] < buf[j * 3 + 1])
+						ccv_set_sparse_matrix_cell_from_vector(deps, vector, buf[j * 3], &buf[j * 3 + 1]);
+					else if (cell.i32[0] == buf[j * 3 + 1]) { // If we point to the same one, use the longest.
+						int p[2] = { cell.i32[0], ccv_max(buf[j * 3 + 2], cell.i32[1]) };
+						ccv_set_sparse_matrix_cell_from_vector(deps, vector, buf[j * 3], &p);
 					}
 				}
 			}
@@ -66,7 +140,50 @@ static ccv_sparse_matrix_t* _ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t
 	} ccv_nnc_graph_visit_endfor
 #undef for_block
 	ccfree(buf);
+	ccv_nnc_exec_dep_t exec_dep = {
+		.chain_ids = chain_ids,
+		.chain_pos = chain_pos,
+		.deps = deps
+	};
 	return exec_dep;
+}
+
+static int _ccv_nnc_exec_dep_dist(const ccv_nnc_exec_dep_t exec_dep, const int d, ccv_sparse_matrix_vector_t* const vector, const int dd)
+{
+	// Check if dd is d's ancestor.
+	const int dd_chain_id = exec_dep.chain_ids[dd];
+	const int dd_chain_pos = exec_dep.chain_pos[dd];
+	if (exec_dep.chain_ids[d] == dd_chain_id)
+		return exec_dep.chain_pos[d] - dd_chain_pos;
+	const ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell_from_vector(exec_dep.deps, vector, dd_chain_id);
+	if (cell.i32 && cell.i32[0] > 0 && cell.i32[0] >= dd_chain_pos)
+	{
+		// Check if the chain pos is greater than or equal to dd_chain_pos. If it is, it is an ancestor.
+		return cell.i32[0] - dd_chain_pos + cell.i32[1];
+	}
+	return -1;
+}
+
+static int _ccv_nnc_exec_dep_check(const ccv_nnc_exec_dep_t exec_dep, const int d, const int dd)
+{
+	// Check if dd is d's ancestor.
+	const int dd_chain_id = exec_dep.chain_ids[dd];
+	const int dd_chain_pos = exec_dep.chain_pos[dd];
+	if (exec_dep.chain_ids[d] == dd_chain_id)
+		return exec_dep.chain_pos[d] > dd_chain_pos;
+	const ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell(exec_dep.deps, d, dd_chain_id);
+	if (cell.i32 && cell.i32[0] > 0)
+	{
+		// Check if the chain pos is greater than or equal to dd_chain_pos. If it is, it is an ancestor.
+		return cell.i32[0] >= dd_chain_pos;
+	}
+	return 0;
+}
+
+static void _ccv_nnc_exec_dep_free(const ccv_nnc_exec_dep_t exec_dep)
+{
+	ccfree(exec_dep.chain_ids);
+	ccv_matrix_free(exec_dep.deps);
 }
 
 typedef struct {
@@ -136,9 +253,11 @@ void ccv_nnc_symbolic_graph_memory_reduction(ccv_nnc_symbolic_graph_t* const gra
 			if ((tensor_marked[d >> 5] & (1u << (d & 0x1f))))
 				tensor_marked[d >> 5] &= ~(1u << (d & 0x1f));
 		}
+	ccv_nnc_graph_visit_t* const reversed_visit = ccv_nnc_graph_visit_new(graph, reversed_nodes, exec_symbol_info_size, destinations, destination_size, sources, source_size, 0);
+	ccv_nnc_exec_dep_t exec_deps = _ccv_nnc_exec_dep_new(graph, visit, reversed_visit);
+	ccv_nnc_graph_visit_free(reversed_visit);
 	// Now tensor_marked only contains the tensors that we think beneficial to reconvert. Find the best place to insert conversion.
 	ccv_nnc_conversion_info_t* const conversion_info = cccalloc(tensor_symbol_info_size, sizeof(ccv_nnc_conversion_info_t));
-	ccv_sparse_matrix_t* const exec_dep = _ccv_nnc_exec_dep_new(graph, visit);
 	ccv_nnc_graph_visit_for(visit, exec_symbol_info, node, idx) {
 		if (node->cmd.cmd == CCV_NNC_DATATYPE_CONVERSION_FORWARD && node->output_size >= 1 && node->outputs[0] >= 0)
 		{
@@ -180,13 +299,13 @@ void ccv_nnc_symbolic_graph_memory_reduction(ccv_nnc_symbolic_graph_t* const gra
 		for (j = 0; j < nodes->rnum; j++)
 		{
 			const int d = *(int*)ccv_array_get(nodes, j);
-			ccv_sparse_matrix_vector_t* vector = ccv_get_sparse_matrix_vector(exec_dep, d);
+			ccv_sparse_matrix_vector_t* const vector = ccv_get_sparse_matrix_vector(exec_deps.deps, d);
 			assert(vector);
 			for (k = 0; k < old_conversion_nodes->rnum; k++)
 			{
 				const int dd = *(int*)ccv_array_get(old_conversion_nodes, k);
-				ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell_from_vector(exec_dep, vector, dd);
-				if (cell.i32 && cell.i32[0] <= 3) // If the old conversion node to existing node has only hop distance of 3, no need to insert new conversion nodes. This is an empirical value.
+				const int dist = _ccv_nnc_exec_dep_dist(exec_deps, d, vector, dd);
+				if (dist >= 0 && dist <= 3)
 					flag = 1;
 			}
 			if (flag)
@@ -219,8 +338,8 @@ void ccv_nnc_symbolic_graph_memory_reduction(ccv_nnc_symbolic_graph_t* const gra
 						continue;
 					}
 					// Check dependencies, if there is a dependency from y node to dd, dd cannot be source.
-					const ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell(exec_dep, dd, ddd);
-					if (cell.i32 && cell.i32[0] > 0)
+					const int checked = _ccv_nnc_exec_dep_check(exec_deps, dd, ddd);
+					if (checked)
 						flag = 1;
 				}
 				if (!flag)
@@ -274,7 +393,7 @@ void ccv_nnc_symbolic_graph_memory_reduction(ccv_nnc_symbolic_graph_t* const gra
 			}
 		}
 	ccv_nnc_graph_visit_free(visit);
-	ccv_matrix_free(exec_dep);
+	_ccv_nnc_exec_dep_free(exec_deps);
 	ccfree(tensor_marked);
 	for (i = 0; i < tensor_symbol_info_size; i++)
 	{
