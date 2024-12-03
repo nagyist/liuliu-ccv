@@ -550,6 +550,7 @@ cc_library(
 		"nnc/ccv_nnc_symbolic_graph_parallel.c",
 		"nnc/ccv_nnc_symbolic_graph_memory_compression.c",
 		"nnc/ccv_nnc_symbolic_graph_memory_reduction.c",
+		"nnc/ccv_nnc_symbolic_graph_chain_decomposition.c",
 		"nnc/ccv_nnc_xpu_alloc.c",
 		"nnc/ccv_nnc_dynamic_graph.c",
 		"nnc/ccv_nnc_dynamic_graph_alloc.c",

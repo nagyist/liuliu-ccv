@@ -217,5 +217,17 @@ void ccv_nnc_symbolic_graph_symbol_infer(const ccv_nnc_symbolic_graph_t* const s
 int ccv_nnc_over_tensor_symbol_aliases(const ccv_nnc_tensor_symbol_info_t* const tensor_a, const ccv_nnc_tensor_symbol_info_t* const tensor_b);
 int ccv_nnc_tensor_symbol_map_raw(ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_tensor_symbol_t symbol);
 
+typedef struct {
+	int flags;
+	int* chain_ids;
+	int* chain_pos;
+	ccv_sparse_matrix_t* deps;
+} ccv_nnc_exec_dep_t;
+
+ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_graph_visit_t* const visit, const ccv_nnc_graph_visit_t* const reversed_visit);
+int ccv_nnc_exec_dep_hop(const ccv_nnc_exec_dep_t exec_dep, const int d, ccv_sparse_matrix_vector_t* const vector, const int dd);
+int ccv_nnc_exec_dep_check(const ccv_nnc_exec_dep_t exec_dep, const int d, const int dd);
+void ccv_nnc_exec_dep_free(const ccv_nnc_exec_dep_t exec_dep);
+
 #endif
 
