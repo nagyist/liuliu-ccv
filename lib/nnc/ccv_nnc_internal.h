@@ -460,6 +460,16 @@ static inline void ccv_nnc_graph_visit_free(ccv_nnc_graph_visit_t* graph_visit)
 #define ccv_nnc_graph_visit_for(graph_visit, nodes, ...) \
 	CCV_NNC_GRAPH_VISIT_FOR1(graph_visit, nodes, ##__VA_ARGS__, _node_unused_, _index_unused_, _term_unused_)
 
+#define CCV_NNC_GRAPH_VISIT_FOR1_REVERSED(graph_visit, nodes, _node_, _index_, _term_, ...) { \
+	int _i_; \
+	for (_i_ = (graph_visit)->size - 1; _i_ >= 0; _i_--) { \
+		const int _index_ __attribute__((unused)) = (graph_visit)->node[_i_].index; \
+		const int _term_ __attribute__((unused)) = (graph_visit)->node[_i_].term; \
+		typeof ((nodes)) const _node_ __attribute__((unused)) = (nodes) + _index_; \
+
+#define ccv_nnc_graph_visit_for_reversed(graph_visit, nodes, ...) \
+	CCV_NNC_GRAPH_VISIT_FOR1_REVERSED(graph_visit, nodes, ##__VA_ARGS__, _node_unused_, _index_unused_, _term_unused_)
+
 #define ccv_nnc_graph_visit_endfor } }
 
 #define CCV_NNC_GRAPH_VISIT_NEW_VISITOR1(_, _index_, _term_) \

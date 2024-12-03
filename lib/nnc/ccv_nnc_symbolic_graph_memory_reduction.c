@@ -80,9 +80,7 @@ void ccv_nnc_symbolic_graph_memory_reduction(ccv_nnc_symbolic_graph_t* const gra
 			if ((tensor_marked[d >> 5] & (1u << (d & 0x1f))))
 				tensor_marked[d >> 5] &= ~(1u << (d & 0x1f));
 		}
-	ccv_nnc_graph_visit_t* const reversed_visit = ccv_nnc_graph_visit_new(graph, reversed_nodes, exec_symbol_info_size, destinations, destination_size, sources, source_size, 0);
-	ccv_nnc_exec_dep_t exec_deps = ccv_nnc_exec_dep_new(graph, visit, reversed_visit);
-	ccv_nnc_graph_visit_free(reversed_visit);
+	ccv_nnc_exec_dep_t exec_deps = ccv_nnc_exec_dep_new(graph, visit);
 	// Now tensor_marked only contains the tensors that we think beneficial to reconvert. Find the best place to insert conversion.
 	ccv_nnc_conversion_info_t* const conversion_info = cccalloc(tensor_symbol_info_size, sizeof(ccv_nnc_conversion_info_t));
 	ccv_nnc_graph_visit_for(visit, exec_symbol_info, node, idx) {

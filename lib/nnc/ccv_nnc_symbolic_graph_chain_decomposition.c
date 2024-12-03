@@ -5,7 +5,7 @@
 #include "_ccv_nnc_symbolic_graph.h"
 
 // Implement the new method for exec_dep. We use chain decomposition such that each node only needs to log which chain and at which node to be dependent on.
-ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_graph_visit_t* const visit, const ccv_nnc_graph_visit_t* const reversed_visit)
+ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_graph_visit_t* const visit)
 {
 	const int exec_symbol_info_size = graph->exec_symbol_info->rnum;
 	int* chain_ids = ccmalloc(sizeof(int) * exec_symbol_info_size * 2);
@@ -15,7 +15,9 @@ ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const gr
 	const ccv_nnc_graph_exec_symbol_info_t* const exec_symbol_info = (ccv_nnc_graph_exec_symbol_info_t*)ccv_array_get(graph->exec_symbol_info, 0);
 	int i, j;
 	// Go reverse order to generate the distance from sink.
-	ccv_nnc_graph_visit_for(reversed_visit, exec_symbol_info, node, idx, term) {
+	ccv_nnc_graph_visit_for_reversed(visit, exec_symbol_info, node, idx, term) {
+		if (node->flags & CCV_NNC_GRAPH_EXEC_DEAD)
+			continue;
 		chain_ids[idx] = -1;
 		if (!node->outgoings || node->outgoings->rnum == 0)
 		{
@@ -35,6 +37,8 @@ ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const gr
 	// Note that we cannot use depth so-far because then multiple exit nodes are equally good to "inherit" the chain selection.
 	int chain_count = 0;
 	ccv_nnc_graph_visit_for(visit, exec_symbol_info, node, idx, term) {
+		if (node->flags & CCV_NNC_GRAPH_EXEC_DEAD)
+			continue;
 		int chain_id = chain_ids[idx];
 		if (chain_ids[idx] < 0)
 		{
@@ -45,7 +49,7 @@ ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const gr
 		}
 		if (!node->outgoings || node->outgoings->rnum == 0)
 			continue;
-		int depth = 0;
+		int depth = -1;
 		int next_idx = -1;
 		for (i = 0; i < node->outgoings->rnum; i++)
 		{
@@ -56,7 +60,8 @@ ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const gr
 		if (next_idx >= 0)
 		{
 			chain_ids[next_idx] = chain_id;
-			chain_pos[next_idx] = chain_pos[idx] + 1;
+			assert(reversed_depth[idx] - depth >= 1);
+			chain_pos[next_idx] = chain_pos[idx] + (reversed_depth[idx] - depth);
 		}
 	} ccv_nnc_graph_visit_endfor
 	if (exec_symbol_info_size < chain_count * 3) // Be more conservative on RAM usage.
@@ -133,38 +138,6 @@ ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const gr
 		.deps = deps
 	};
 	return exec_dep;
-}
-
-int ccv_nnc_exec_dep_hop(const ccv_nnc_exec_dep_t exec_dep, const int d, ccv_sparse_matrix_vector_t* const vector, const int dd)
-{
-	// Check if dd is d's ancestor.
-	const int dd_chain_id = exec_dep.chain_ids[dd];
-	const int dd_chain_pos = exec_dep.chain_pos[dd];
-	if (exec_dep.chain_ids[d] == dd_chain_id)
-		return exec_dep.chain_pos[d] - dd_chain_pos;
-	const ccv_numeric_data_t cell = vector ? ccv_get_sparse_matrix_cell_from_vector(exec_dep.deps, vector, dd_chain_id) : ccv_get_sparse_matrix_cell(exec_dep.deps, d, dd_chain_id);
-	if (cell.i32 && cell.i32[0] > 0 && cell.i32[0] >= dd_chain_pos)
-	{
-		// Check if the chain pos is greater than or equal to dd_chain_pos. If it is, it is an ancestor.
-		return cell.i32[0] - dd_chain_pos + cell.i32[1];
-	}
-	return -1;
-}
-
-int ccv_nnc_exec_dep_check(const ccv_nnc_exec_dep_t exec_dep, const int d, const int dd)
-{
-	// Check if dd is d's ancestor.
-	const int dd_chain_id = exec_dep.chain_ids[dd];
-	const int dd_chain_pos = exec_dep.chain_pos[dd];
-	if (exec_dep.chain_ids[d] == dd_chain_id)
-		return exec_dep.chain_pos[d] > dd_chain_pos;
-	const ccv_numeric_data_t cell = ccv_get_sparse_matrix_cell(exec_dep.deps, d, dd_chain_id);
-	if (cell.i32 && cell.i32[0] > 0)
-	{
-		// Check if the chain pos is greater than or equal to dd_chain_pos. If it is, it is an ancestor.
-		return cell.i32[0] >= dd_chain_pos;
-	}
-	return 0;
 }
 
 void ccv_nnc_exec_dep_free(const ccv_nnc_exec_dep_t exec_dep)
