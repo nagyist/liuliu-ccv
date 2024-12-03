@@ -163,7 +163,7 @@ void ccv_nnc_symbolic_graph_memory_reduction(ccv_nnc_symbolic_graph_t* const gra
 						continue;
 					}
 					// Check dependencies, if there is a dependency from y node to dd, dd cannot be source.
-					const int checked = ccv_nnc_exec_dep_check(exec_deps, dd, ddd);
+					const int checked = ccv_nnc_exec_dep_check(exec_deps, dd, 0, ddd);
 					if (checked)
 						flag = 1;
 				}

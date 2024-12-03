@@ -80,6 +80,8 @@ ccv_nnc_exec_dep_t ccv_nnc_exec_dep_new(const ccv_nnc_symbolic_graph_t* const gr
 	} while (0)
 	int buf_size;
 	ccv_nnc_graph_visit_for(visit, exec_symbol_info, node, idx, term) {
+		if (node->flags & CCV_NNC_GRAPH_EXEC_DEAD)
+			continue;
 		buf_size = 0; /* save all its parent deps to this buffer */
 		ccv_sparse_matrix_vector_t* vector = ccv_get_sparse_matrix_vector(deps, idx);
 		if (vector)
