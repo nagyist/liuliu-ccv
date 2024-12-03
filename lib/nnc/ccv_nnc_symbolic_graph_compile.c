@@ -4266,7 +4266,10 @@ int ccv_nnc_tensor_arena_reinit(ccv_nnc_tensor_arena_t* const tensor_arena, cons
 				const int alias_ref = tensor_arena->vt_alias_refs[i] - 1;
 				ccv_nnc_tensor_data(tensor->info, tensor_arena->vt_tensors[alias_ref]->data.u8, off + tensor_arena->vt_tensors[alias_ref]->dataof, &tensor->data, &tensor->dataof);
 				if (CCV_IS_TENSOR_VIEW(tensor))
+				{
 					((ccv_nnc_tensor_view_t*)tensor)->off = off;
+					memcpy(((ccv_nnc_tensor_view_t*)tensor)->stride, symbol_info->stride, sizeof(((ccv_nnc_tensor_view_t*)tensor)->stride));
+				}
 			}
 		}
 	// Should handle sub_tensor_arena, don't do that at the moment.
