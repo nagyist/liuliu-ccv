@@ -127,7 +127,7 @@ CCV_WARN_UNUSED(size_t) ccv_nnc_cublas_workspace_size_in_bytes(const ccv_nnc_ten
 #define CUFILE_ENFORCE(status) do {                               \
 	const CUfileError_t __status = status;                        \
 	if (__status.err != CU_FILE_SUCCESS) {                        \
-		printf("[%s:%d]:CUDA - Error: %s\n",                      \
+		printf("[%s:%d]:CUFILE - Error: %s\n",                    \
 				__FILE__, __LINE__, CUFILE_ERRSTR(__status.err)); \
 		assert(0);                                                \
 		exit(EXIT_FAILURE);                                       \
