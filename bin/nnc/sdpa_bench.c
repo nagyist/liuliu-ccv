@@ -64,11 +64,13 @@ int main(int argc, char** argv)
 		ccv_nnc_tensor_t* const gpu_o_tensor = ccv_nnc_tensor_new(0, GPU_TENSOR_NHWC(000, 16F, B, R, Hq, D), 0);
 		ccv_nnc_cmd_exec(CMD_DATA_TRANSFER_FORWARD(), ccv_nnc_no_hint, 0, TENSOR_LIST(q_tensor_f16, k_tensor_f16, v_tensor_f16), TENSOR_LIST(gpu_q_tensor, gpu_k_tensor, gpu_v_tensor), 0);
 
+		ccv_nnc_cmd_t scaled_dot_product_attention = CMD_SCALED_DOT_PRODUCT_ATTENTION_FORWARD(scale, is_causal);
+		scaled_dot_product_attention.info.scaled_dot_product_attention.flags = CCV_NNC_GEMM_16F;
 		for (int i = 0; i < 5; i++)
-			ccv_nnc_cmd_exec(CMD_SCALED_DOT_PRODUCT_ATTENTION_FORWARD(scale, is_causal), ccv_nnc_no_hint, 0, TENSOR_LIST(gpu_q_tensor, gpu_k_tensor, gpu_v_tensor, NULL, NULL, NULL), TENSOR_LIST(gpu_o_tensor, NULL), 0);
+			ccv_nnc_cmd_exec(scaled_dot_product_attention, ccv_nnc_no_hint, 0, TENSOR_LIST(gpu_q_tensor, gpu_k_tensor, gpu_v_tensor, NULL, NULL, NULL), TENSOR_LIST(gpu_o_tensor, NULL), 0);
 		double elapsed_time = get_current_time();
 		for (int i = 0; i < 40; i++)
-			ccv_nnc_cmd_exec(CMD_SCALED_DOT_PRODUCT_ATTENTION_FORWARD(scale, is_causal), ccv_nnc_no_hint, 0, TENSOR_LIST(gpu_q_tensor, gpu_k_tensor, gpu_v_tensor, NULL, NULL, NULL), TENSOR_LIST(gpu_o_tensor, NULL), 0);
+			ccv_nnc_cmd_exec(scaled_dot_product_attention, ccv_nnc_no_hint, 0, TENSOR_LIST(gpu_q_tensor, gpu_k_tensor, gpu_v_tensor, NULL, NULL, NULL), TENSOR_LIST(gpu_o_tensor, NULL), 0);
 		elapsed_time = get_current_time() - elapsed_time;
 		printf("%d, %d, %d, %d, %d, %d, %2.3f\n", B, R, C, Hq, Hk, D, elapsed_time);
 
