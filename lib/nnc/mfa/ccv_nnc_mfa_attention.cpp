@@ -148,9 +148,7 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
       }
     
       MTL::Size gridSize
-      (ceilDivide(int64_t(hash.R), kernel->blockDimensions[0]),
-       hash.Hq,
-       attentionDesc.batchDimension);
+      (ceilDivide(int64_t(hash.R), kernel->blockDimensions[0]) * hash.Hq * attentionDesc.batchDimension, 1, 1);
       MTL::Size groupSize
       (int64_t(kernel->threadgroupSize), 1, 1);
     
@@ -239,9 +237,7 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
       }
 
       MTL::Size backwardQueryGridSize
-      (ceilDivide(int64_t(hash.R), backwardQueryKernel->blockDimensions[0]),
-       hash.Hq,
-       attentionDesc.batchDimension);
+      (ceilDivide(int64_t(hash.R), backwardQueryKernel->blockDimensions[0]) * hash.Hq * attentionDesc.batchDimension, 1, 1);
       MTL::Size backwardQueryGroupSize
       (int64_t(backwardQueryKernel->threadgroupSize), 1, 1);
 
@@ -286,9 +282,7 @@ void ccv_nnc_mfa_encode_attention(mfa::context* context, ccv_nnc_mfa_attention_p
       }
 
       MTL::Size backwardKeyValueGridSize
-      (ceilDivide(int64_t(hash.C), backwardKeyValueKernel->blockDimensions[0]),
-       hash.Hq,
-       attentionDesc.batchDimension);
+      (ceilDivide(int64_t(hash.C), backwardKeyValueKernel->blockDimensions[0]) * hash.Hq * attentionDesc.batchDimension, 1, 1);
       MTL::Size backwardKeyValueGroupSize
       (int64_t(backwardKeyValueKernel->threadgroupSize), 1, 1);
 

@@ -427,6 +427,17 @@ std::string AttentionKernel::createSource() const noexcept {
     kernel void attention(
 )";
   source += createBufferBindings() + "\n";
+  switch (type.value) {
+  case AttentionKernelType::forward:
+    source.SetValue("DISPATCH_DIMENSION", "R");
+    break;
+  case AttentionKernelType::backwardQuery:
+    source.SetValue("DISPATCH_DIMENSION", "R");
+    break;
+  case AttentionKernelType::backwardKeyValue:
+    source.SetValue("DISPATCH_DIMENSION", "C");
+    break;
+  }
   source.SetValue("BLOCK_DIMENSIONS_PARALLELIZATION", std::to_string(blockDimensions[0]));
   source.SetValue("PARALLELIZATION_GROUP_OFFSET", parallelizationGroupOffsetValue());
   source.SetValue("PARALLELIZATION_DIMENSION", parallelizationDimensionValue());
@@ -438,6 +449,7 @@ std::string AttentionKernel::createSource() const noexcept {
       ushort lane_id [[thread_index_in_simdgroup]]
     ) {
       ushort2 morton_offset = morton_order(lane_id);
+      gid = { gid.x % (({{DISPATCH_DIMENSION}} + {{BLOCK_DIMENSIONS_PARALLELIZATION}} - 1) / {{BLOCK_DIMENSIONS_PARALLELIZATION}}), (gid.x / (({{DISPATCH_DIMENSION}} + {{BLOCK_DIMENSIONS_PARALLELIZATION}} - 1) / {{BLOCK_DIMENSIONS_PARALLELIZATION}})) % Hq, gid.x / (Hq * (({{DISPATCH_DIMENSION}} + {{BLOCK_DIMENSIONS_PARALLELIZATION}} - 1) / {{BLOCK_DIMENSIONS_PARALLELIZATION}}))};
       uint parallelization_group_offset = gid.x;
       parallelization_group_offset *= {{BLOCK_DIMENSIONS_PARALLELIZATION}};
       
