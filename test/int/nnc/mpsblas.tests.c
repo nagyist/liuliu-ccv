@@ -1526,18 +1526,18 @@ TEST_CASE("scaled dot product attention with mps")
 {
 	GUARD_ELSE_RETURN(ccv_nnc_cmd_ok(CCV_NNC_SCALED_DOT_PRODUCT_ATTENTION_FORWARD, CCV_NNC_BACKEND_MPS));
 	// Bypass error: variable-sized object may not be initialized
-#define num_long_trials 3
+#define num_long_trials 4
 #define num_short_trials 2
 #define num_trials (num_long_trials + num_short_trials)
 
-	for (int trial = 0; trial < num_trials; ++trial) {
-		int B_candidates[num_trials] =         {  32,  32,   3, 2, 1 };
-		int R_candidates[num_trials] =         { 128, 128,  61, 6, 2 };
-		int C_candidates[num_trials] =         { 128, 128,  49, 2, 1 };
-		int Hq_candidates[num_trials] =        {   8,  32,  13, 3, 1 };
-		int Hk_candidates[num_trials] =        {   8,   8,  13, 3, 1 };
-		int D_candidates[num_trials] =         {  64, 128, 191, 4, 8 };
-		int is_causal_candidates[num_trials] = {   0,   1,   0, 1, 0 };
+	for (int trial = 0; trial < num_long_trials; ++trial) {
+		int B_candidates[num_trials] =         {  32, 1,  32,   3, 2, 1 };
+		int R_candidates[num_trials] =         { 128, 4096, 128,  61, 6, 2 };
+		int C_candidates[num_trials] =         { 128, 4096, 128,  49, 2, 1 };
+		int Hq_candidates[num_trials] =        {   8, 32,  32,  13, 3, 1 };
+		int Hk_candidates[num_trials] =        {   8, 32,   8,  13, 3, 1 };
+		int D_candidates[num_trials] =         {  64, 32, 128, 191, 4, 8 };
+		int is_causal_candidates[num_trials] = {   0, 0,   1,   0, 1, 0 };
 
 		int B = B_candidates[trial];
 		int R = R_candidates[trial];
@@ -1554,13 +1554,13 @@ TEST_CASE("scaled dot product attention with mps")
 		ccv_nnc_tensor_t* const v_tensor = ccv_nnc_tensor_new(0, CPU_TENSOR_NHWC(32F, B, C, Hk, D), 0);
 
 		for (int i = 0; i < B * R * Hq * D; ++i) {
-			q_tensor->data.f32[i] = (float)(i) / (float)(B * R * Hq * D);
+			q_tensor->data.f32[i] = (float)(i) / (float)(ccv_min(B * R * Hq * D, 131072));
 		}
 		for (int i = 0; i < B * C * Hk * D; ++i) {
-			k_tensor->data.f32[i] = (float)(i) / (float)(B * C * Hk * D);
+			k_tensor->data.f32[i] = (float)(i) / (float)(ccv_min(B * C * Hk * D, 131072));
 		}
 		for (int i = 0; i < B * C * Hk * D; ++i) {
-			v_tensor->data.f32[i] = (float)(i) / (float)(B * C * Hk * D);
+			v_tensor->data.f32[i] = (float)(i) / (float)(ccv_min(B * C * Hk * D, 131072));
 		}
 
 		ccv_nnc_tensor_t* const o_tensor = ccv_nnc_tensor_new(0, CPU_TENSOR_NHWC(32F, B, R, Hq, D), 0);
