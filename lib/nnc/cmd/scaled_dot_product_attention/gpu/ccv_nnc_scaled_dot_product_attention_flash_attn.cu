@@ -178,7 +178,8 @@ static int _ccv_nnc_scaled_dot_product_attention_forw(const ccv_nnc_cmd_t cmd, c
 	// In any case we don't expect seqlen_q to be larger than 64 for inference.
 	const int num_m_blocks = (R + 64 - 1) / 64;
 	const ccv_nnc_cuda_device_prop_t props = ccv_nnc_gpu_device_props();
-	params.num_splits = num_splits_heuristic(batch_size * Hq * num_m_blocks, props.multi_processor_count, num_n_blocks, 128);
+	// Only enable splitkv if R is 1.
+	params.num_splits = R == 1 ? num_splits_heuristic(batch_size * Hq * num_m_blocks, props.multi_processor_count * 2, num_n_blocks, 128) : 1;
 	if (saved_softmax_lse)
 		params.softmax_lse_ptr = saved_softmax_lse->data.u8;
 	if (params.num_splits > 1)
