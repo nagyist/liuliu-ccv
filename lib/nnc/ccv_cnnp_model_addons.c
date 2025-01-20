@@ -1102,16 +1102,18 @@ static void _ccv_cnnp_convolution_build(ccv_cnnp_model_t* const super, ccv_nnc_s
 	assert(output_size == 1);
 	const ccv_nnc_tensor_param_t params = ccv_nnc_tensor_symbol_params(graph, inputs[0]);
 	int i;
-	const int nd = CCV_NNC_MAX_DIM + 2;
+	const int k_nd = ccv_nnc_tensor_nd(self->kdim);
+	const int nd = k_nd + 2;
 	ccv_nnc_tensor_param_t weights_params = params;
 	if (self->format)
 		weights_params.format = self->format;
 	ccv_nnc_tensor_set_n(&weights_params, self->filters);
-	assert(ccv_nnc_tensor_get_c(params) % self->groups == 0);
-	ccv_nnc_tensor_set_c(&weights_params, nd, ccv_nnc_tensor_get_c(params) / self->groups);
+	const int c = ccv_nnc_tensor_get_c(params);
+	assert(c % self->groups == 0);
+	ccv_nnc_tensor_set_c(&weights_params, nd, c / self->groups);
 	const int hw = ccv_nnc_tensor_hw(weights_params, nd);
 	assert(hw >= 0);
-	for (i = 0; i < CCV_NNC_MAX_DIM; i++)
+	for (i = 0; i < k_nd; i++)
 		weights_params.dim[i + hw] = self->kdim[i];
 	if (!self->weights.graph)
 		self->weights = ccv_nnc_tensor_symbol_new(graph, weights_params, "weights");
@@ -1122,12 +1124,13 @@ static void _ccv_cnnp_convolution_build(ccv_cnnp_model_t* const super, ccv_nnc_s
 	memset(bias_params.dim, 0, sizeof(bias_params.dim));
 	bias_params.dim[0] = self->filters;
 	ccv_nnc_cmd_t cmd = CMD_CONVOLUTION_FORWARD(self->groups, self->filters);
-	for (i = 0; i < CCV_NNC_MAX_DIM; i++)
+	for (i = 0; i < k_nd; i++)
 		cmd.info.size.dim[i] = self->kdim[i];
+	cmd.info.size.dim[k_nd] = c;
 	memcpy(cmd.info.convolution.dilation, self->dilation, sizeof(self->dilation));
 	ccv_nnc_tensor_param_t output_params;
 	// Dilate weight size based on the dilation factor.
-	for (i = 0; i < CCV_NNC_MAX_DIM; i++)
+	for (i = 0; i < k_nd; i++)
 		weights_params.dim[i + hw] = (self->kdim[i] - 1) * ccv_max(self->dilation[i], 1) + 1;
 	ccv_nnc_hint_tensor_auto(cmd, (ccv_nnc_tensor_param_t []){
 			params,
@@ -1235,8 +1238,9 @@ static void _ccv_cnnp_convolution_transpose_build(ccv_cnnp_model_t* const super,
 	ccv_nnc_tensor_param_t weights_params = params;
 	if (self->format)
 		weights_params.format = self->format;
-	ccv_nnc_tensor_set_n(&weights_params, ccv_nnc_tensor_get_c(params));
-	assert(ccv_nnc_tensor_get_c(params) % self->groups == 0);
+	const int c = ccv_nnc_tensor_get_c(params);
+	ccv_nnc_tensor_set_n(&weights_params, c);
+	assert(c % self->groups == 0);
 	ccv_nnc_tensor_set_c(&weights_params, nd, self->filters / self->groups);
 	const int hw = ccv_nnc_tensor_hw(weights_params, nd);
 	assert(hw >= 0);
@@ -1253,6 +1257,7 @@ static void _ccv_cnnp_convolution_transpose_build(ccv_cnnp_model_t* const super,
 	ccv_nnc_cmd_t cmd = CMD_CONVOLUTION_TRANSPOSE_FORWARD(self->groups, self->filters, self->output_padding);
 	for (i = 0; i < CCV_NNC_MAX_DIM; i++)
 		cmd.info.size.dim[i] = self->kdim[i];
+	cmd.info.size.dim[CCV_NNC_MAX_DIM] = c;
 	memcpy(cmd.info.convolution_transpose.dilation, self->dilation, sizeof(self->dilation));
 	ccv_nnc_tensor_param_t output_params;
 	// Dilate weight size based on the dilation factor.
