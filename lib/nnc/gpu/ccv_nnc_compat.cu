@@ -1431,7 +1431,7 @@ ccv_nnc_cudnn_filter_descriptor_t ccv_nnc_cudnn_get_filter_descriptor(const ccv_
 	};
 	assert(CCV_IS_TENSOR_CONTIGUOUS(tensor));
 	const int nd = ccv_nnc_tensor_nd(tensor->info.dim);
-	assert(nd == CCV_NNC_MAX_DIM + 2);
+	assert(nd == CCV_NNC_MAX_DIM + 2 || nd == CCV_NNC_MAX_DIM + 3);
 	int dim[CCV_NNC_MAX_DIM_ALLOC] = {};
 	int i;
 	if (tensor->info.format == CCV_TENSOR_FORMAT_NCHW)
@@ -1486,7 +1486,7 @@ ccv_nnc_cudnn_convolution_descriptor_t ccv_nnc_cudnn_get_convolution_descriptor(
 	{
 		CUDNN_ENFORCE(cudnnSetConvolution2dDescriptor(convolution_desc.descriptor, p[0], p[1], v[0], v[1], u[0], u[1], CUDNN_CROSS_CORRELATION, ccv_nnc_cudnn_datatype(datatype)));
 	} else {
-		CUDNN_ENFORCE(cudnnSetConvolutionNdDescriptor(convolution_desc.descriptor, CCV_NNC_MAX_DIM, p, v, u, CUDNN_CROSS_CORRELATION, ccv_nnc_cudnn_datatype(datatype)));
+		CUDNN_ENFORCE(cudnnSetConvolutionNdDescriptor(convolution_desc.descriptor, size_nd, p, v, u, CUDNN_CROSS_CORRELATION, ccv_nnc_cudnn_datatype(datatype)));
 	}
 	CUDNN_ENFORCE(cudnnSetConvolutionMathType(convolution_desc.descriptor, CUDNN_TENSOR_OP_MATH));
 	return convolution_desc;

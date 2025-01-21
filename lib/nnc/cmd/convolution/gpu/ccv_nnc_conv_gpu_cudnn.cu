@@ -102,7 +102,27 @@ static int _ccv_nnc_conv_forw(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_t hint
 	CUDNN_ENFORCE(cudnnConvolutionForward(cudnn, &one, a.descriptor, a.data.u8, w.descriptor, weight_data, conv.descriptor, algo, workspace, workspace_size, &zero, b.descriptor, b.data.u8));
 	if (input_size > 2 && inputs[2])
 	{
-		const ccv_nnc_cudnn_tensor_view_descriptor_t bias = ccv_nnc_cudnn_get_tensor_view_descriptor(stream_context, (const ccv_nnc_tensor_view_t*)inputs[2]);
+		const int w_nd = ccv_nnc_tensor_nd(inputs[1]->info.dim);
+		ccv_nnc_cudnn_tensor_view_descriptor_t bias;
+		if (w_nd <= 4)
+			bias = ccv_nnc_cudnn_get_tensor_view_descriptor(stream_context, (const ccv_nnc_tensor_view_t*)inputs[2]);
+		else if (w_nd == 5) {
+			ccv_nnc_tensor_view_t biast = ccv_nnc_get_tensor_view(inputs[2]);
+			const int b_nd = ccv_nnc_tensor_nd(outputs[0]->info.dim);
+			if (outputs[0]->info.format == CCV_TENSOR_FORMAT_NHWC)
+			{
+				biast.info.format = CCV_TENSOR_FORMAT_NHWC;
+				biast.info.dim[0] = biast.info.dim[1] = biast.info.dim[2] = biast.info.dim[3] = 1;
+				biast.info.dim[b_nd == 4 ? 3 : 4] = inputs[1]->info.dim[0];
+			} else if (outputs[0]->info.format == CCV_TENSOR_FORMAT_NCHW) {
+				biast.info.format = CCV_TENSOR_FORMAT_NCHW;
+				biast.info.dim[0] = biast.info.dim[1] = biast.info.dim[2] = biast.info.dim[3] = biast.info.dim[4] = 1;
+				biast.info.dim[b_nd == 4 ? 0 : 1] = inputs[1]->info.dim[0];
+			}
+			bias = ccv_nnc_cudnn_get_tensor_view_descriptor(stream_context, &biast);
+		} else {
+			assert(0 && "w should be either 4-dimension or 5-dimension");
+		}
 		CUDNN_ENFORCE(cudnnAddTensor(cudnn, &one, bias.descriptor, bias.data.u8, &one, b.descriptor, b.data.u8));
 		ccv_nnc_cudnn_deinit_tensor_view_descriptor(bias);
 	}
