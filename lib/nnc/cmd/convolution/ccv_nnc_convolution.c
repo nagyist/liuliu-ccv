@@ -96,7 +96,7 @@ static void _ccv_nnc_conv_transpose_tensor_auto_forw(const ccv_nnc_cmd_param_t c
 	assert(inputs[0].format == outputs[0].format);
 	const int nd = ccv_nnc_tensor_nd(inputs[0].dim);
 	assert(nd == size_nd + 1 || nd == size_nd + 2);
-	int hw = ccv_nnc_tensor_hw(inputs[0], nd);
+	int hw = ccv_nnc_tensor_hw(inputs[0], nd, size_nd);
 	assert(hw >= 0);
 	for (i = 0; i < size_nd; i++)
 	{

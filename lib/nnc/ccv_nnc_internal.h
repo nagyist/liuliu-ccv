@@ -41,15 +41,15 @@ typedef struct {
 	void* aux; /**< [aux] The additional information available for a particular command under a particular backend. */
 } ccv_nnc_cmd_backend_registry_t;
 
-static inline int ccv_nnc_tensor_hw(const ccv_nnc_tensor_param_t a, const int nd)
+static inline int ccv_nnc_tensor_hw(const ccv_nnc_tensor_param_t a, const int nd, const int size_nd)
 {
 	if ((a.format == CCV_TENSOR_FORMAT_CHWN) ||
-		(a.format == CCV_TENSOR_FORMAT_NHWC && nd == CCV_NNC_MAX_DIM + 1))
+		(a.format == CCV_TENSOR_FORMAT_NHWC && nd == size_nd + 1))
 		return 0;
-	else if ((a.format == CCV_TENSOR_FORMAT_NHWC && nd == CCV_NNC_MAX_DIM + 2) ||
-			 (a.format == CCV_TENSOR_FORMAT_NCHW && nd == CCV_NNC_MAX_DIM + 1))
+	else if ((a.format == CCV_TENSOR_FORMAT_NHWC && nd == size_nd + 2) ||
+			 (a.format == CCV_TENSOR_FORMAT_NCHW && nd == size_nd + 1))
 		return 1;
-	else if (a.format == CCV_TENSOR_FORMAT_NCHW && nd == CCV_NNC_MAX_DIM + 2)
+	else if (a.format == CCV_TENSOR_FORMAT_NCHW && nd == size_nd + 2)
 		return 2;
 	return -1;
 }
@@ -59,11 +59,11 @@ static inline void ccv_nnc_hint_tensor_forward(const ccv_nnc_cmd_param_t cmd, co
 	int i;
 	assert(a.format == b->format);
 	const int nd = ccv_nnc_tensor_nd(a.dim);
-	assert(nd == CCV_NNC_MAX_DIM + 1 || nd == CCV_NNC_MAX_DIM + 2);
-	int hw = ccv_nnc_tensor_hw(a, nd);
-	assert(hw >= 0);
 	const int size_nd = ccv_nnc_tensor_nd(cmd.size.dim) - 1;
 	assert(size_nd == 2 || size_nd == 3); // Support 3D convolution.
+	assert(nd == size_nd + 1 || nd == size_nd + 2);
+	int hw = ccv_nnc_tensor_hw(a, nd, size_nd);
+	assert(hw >= 0);
 	for (i = 0; i < size_nd; i++)
 	{
 		int stride = ccv_max(1, hint.stride.dim[i]);
@@ -76,11 +76,11 @@ static inline void ccv_nnc_hint_tensor_backward(const ccv_nnc_cmd_param_t cmd, c
 	int i;
 	assert(a.format == b->format);
 	const int nd = ccv_nnc_tensor_nd(a.dim);
-	assert(nd == CCV_NNC_MAX_DIM + 1 || nd == CCV_NNC_MAX_DIM + 2);
-	int hw = ccv_nnc_tensor_hw(a, nd);
-	assert(hw >= 0);
 	const int size_nd = ccv_nnc_tensor_nd(cmd.size.dim) - 1;
 	assert(size_nd == 2 || size_nd == 3); // Support 3D convolution.
+	assert(nd == size_nd + 1 || nd == size_nd + 2);
+	int hw = ccv_nnc_tensor_hw(a, nd, size_nd);
+	assert(hw >= 0);
 	for (i = 0; i < size_nd; i++)
 	{
 		int stride = ccv_max(1, hint.stride.dim[i]);
