@@ -1108,7 +1108,23 @@ static void _ccv_cnnp_convolution_build(ccv_cnnp_model_t* const super, ccv_nnc_s
 	if (self->format)
 		weights_params.format = self->format;
 	ccv_nnc_tensor_set_n(&weights_params, self->filters);
-	const int c = ccv_nnc_tensor_get_c(params);
+	const int a_nd = ccv_nnc_tensor_nd(params.dim);
+	int c;
+	switch (params.format)
+	{
+		case CCV_TENSOR_FORMAT_NHWC:
+			c = params.dim[a_nd - 1];
+			break;
+		case CCV_TENSOR_FORMAT_NCHW:
+			if (a_nd == k_nd + 1)
+				c = params.dim[0];
+			else
+				c = params.dim[a_nd <= 1 ? 0 : 1];
+			break;
+		case CCV_TENSOR_FORMAT_CHWN:
+			c = params.dim[0];
+			break;
+	}
 	assert(c % self->groups == 0);
 	ccv_nnc_tensor_set_c(&weights_params, nd, c / self->groups);
 	int hw = -1;

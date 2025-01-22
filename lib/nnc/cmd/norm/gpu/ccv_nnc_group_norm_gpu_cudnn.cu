@@ -88,12 +88,13 @@ static int _ccv_nnc_group_norm_forw(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_
 	assert(ccv_nnc_tensor_view_check_dim((ccv_nnc_tensor_view_t*)outputs[0], adim));
 	int x;
 	int n = 1;
-	for (x = 0; x < CCV_NNC_MAX_DIM + 2; x++)
+	const int a_nd = ccv_nnc_tensor_nd(adim);
+	for (x = 0; x < a_nd; x++)
 		n *= adim[x];
-	for (x = 0; x < CCV_NNC_MAX_DIM + 2; x++)
+	for (x = 0; x < a_nd; x++)
 		n /= rdim[x];
 	int rcount = 1;
-	for (x = 0; x < CCV_NNC_MAX_DIM + 2; x++)
+	for (x = 0; x < a_nd; x++)
 		rcount *= rdim[x];
 	const float inv_n = 1. / n;
 	cudnnReduceTensorDescriptor_t reduce = ccv_nnc_stream_context_get_reduce_tensor_descriptor(stream_context);
@@ -197,12 +198,13 @@ static int _ccv_nnc_group_norm_back(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint_
 	static const float one = 1, zero = 0, neg_one = -1;
 	int x;
 	int n = 1;
-	for (x = 0; x < CCV_NNC_MAX_DIM + 2; x++)
+	const int g_nd = ccv_nnc_tensor_nd(gdim);
+	for (x = 0; x < g_nd; x++)
 		n *= gdim[x];
-	for (x = 0; x < CCV_NNC_MAX_DIM + 2; x++)
+	for (x = 0; x < g_nd; x++)
 		n /= rdim[x];
 	int gcount = 1, rcount = 1;
-	for (x = 0; x < CCV_NNC_MAX_DIM + 2; x++)
+	for (x = 0; x < g_nd; x++)
 		gcount *= gdim[x], rcount *= rdim[x];
 	const float neg_inv_n = -1. / n;
 	cudnnReduceTensorDescriptor_t reduce = ccv_nnc_stream_context_get_reduce_tensor_descriptor(stream_context);
