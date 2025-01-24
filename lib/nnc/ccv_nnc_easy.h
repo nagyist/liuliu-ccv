@@ -254,12 +254,12 @@ static inline void ccv_nnc_tensor_view_get_dim(const ccv_nnc_tensor_view_t* cons
 {
 	int x;
 	const int nd = ccv_nnc_tensor_nd(tv->info.dim);
-	const int offset = CCV_NNC_MAX_DIM + 2 - nd;
+	const int offset = ccv_max(CCV_NNC_MAX_DIM + 2 - nd, 0);
 	for (x = 0; x < offset; x++)
 		dim[x] = 1;
-	for (x = offset; x < CCV_NNC_MAX_DIM + 2; x++)
+	for (x = offset; x < ccv_max(CCV_NNC_MAX_DIM + 2, nd); x++)
 		dim[x] = tv->info.dim[x - offset];
-	dim[CCV_NNC_MAX_DIM + 2] = 0;
+	dim[ccv_max(CCV_NNC_MAX_DIM + 2, nd)] = 0;
 }
 
 static inline CCV_WARN_UNUSED(int) ccv_nnc_is_tensor_stride_packed(const int stride[CCV_NNC_MAX_DIM_ALLOC], const int dim[CCV_NNC_MAX_DIM_ALLOC])

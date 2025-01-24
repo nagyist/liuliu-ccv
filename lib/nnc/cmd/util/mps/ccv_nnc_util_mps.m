@@ -256,66 +256,64 @@ static int _ccv_nnc_format_transform(const ccv_nnc_cmd_t cmd, const ccv_nnc_hint
 				ccv_nnc_tensor_view_get_stride(a, astride);
 				ccv_nnc_tensor_view_get_dim(&bt, bdim);
 				ccv_nnc_tensor_view_get_stride(&bt, bstride);
+				const int b_nd = ccv_nnc_tensor_nd(bdim);
+				int j;
 				if (a->info.format == CCV_TENSOR_FORMAT_NHWC)
 				{
 					if (bt.info.format == CCV_TENSOR_FORMAT_NCHW)
 					{
 						int c = bdim[1];
-						bdim[1] = bdim[2];
-						bdim[2] = bdim[3];
-						bdim[3] = c;
+						for (j = 1; j < b_nd - 1; j++)
+							bdim[j] = bdim[j + 1];
+						bdim[b_nd - 1] = c;
 						c = bstride[1];
-						bstride[1] = bstride[2];
-						bstride[2] = bstride[3];
-						bstride[3] = c;
+						for (j = 1; j < b_nd - 1; j++)
+							bstride[j] = bstride[j + 1];
+						bstride[b_nd - 1] = c;
 					} else {
 						assert(bt.info.format == CCV_TENSOR_FORMAT_CHWN);
 						int t;
-						CCV_SWAP(bdim[0], bdim[3], t);
-						CCV_SWAP(bstride[0], bstride[3], t);
+						CCV_SWAP(bdim[0], bdim[b_nd - 1], t);
+						CCV_SWAP(bstride[0], bstride[b_nd - 1], t);
 					}
 				} else if (a->info.format == CCV_TENSOR_FORMAT_NCHW) {
 					if (bt.info.format == CCV_TENSOR_FORMAT_NHWC)
 					{
-						int c = bdim[3];
-						bdim[3] = bdim[2];
-						bdim[2] = bdim[1];
+						int c = bdim[b_nd - 1];
+						for (j = b_nd - 1; j > 1; j--)
+							bdim[j] = bdim[j - 1];
 						bdim[1] = c;
-						c = bstride[3];
-						bstride[3] = bstride[2];
-						bstride[2] = bstride[1];
+						c = bstride[b_nd - 1];
+						for (j = b_nd - 1; j > 1; j--)
+							bstride[j] = bstride[j - 1];
 						bstride[1] = c;
 					} else {
 						assert(bt.info.format == CCV_TENSOR_FORMAT_CHWN);
-						int n = bdim[3];
-						bdim[3] = bdim[2];
-						bdim[2] = bdim[1];
-						bdim[1] = bdim[0];
+						int n = bdim[b_nd - 1];
+						for (j = b_nd - 1; j > 0; j--)
+							bdim[j] = bdim[j - 1];
 						bdim[0] = n;
-						n = bstride[3];
-						bstride[3] = bstride[2];
-						bstride[2] = bstride[1];
-						bstride[1] = bstride[0];
+						n = bstride[b_nd - 1];
+						for (j = b_nd - 1; j > 0; j--)
+							bstride[j] = bstride[j - 1];
 						bstride[0] = n;
 					}
 				} else if (a->info.format == CCV_TENSOR_FORMAT_CHWN) {
 					if (bt.info.format == CCV_TENSOR_FORMAT_NCHW)
 					{
 						int n = bdim[0];
-						bdim[0] = bdim[1];
-						bdim[1] = bdim[2];
-						bdim[2] = bdim[3];
-						bdim[3] = n;
+						for (j = 0; j < b_nd - 1; j++)
+							bdim[j] = bdim[j + 1];
+						bdim[b_nd - 1] = n;
 						n = bstride[0];
-						bstride[0] = bstride[1];
-						bstride[1] = bstride[2];
-						bstride[2] = bstride[3];
-						bstride[3] = n;
+						for (j = 0; j < b_nd - 1; j++)
+							bstride[j] = bstride[j + 1];
+						bstride[b_nd - 1] = n;
 					} else {
 						assert(bt.info.format == CCV_TENSOR_FORMAT_NHWC);
 						int t;
-						CCV_SWAP(bdim[0], bdim[3], t);
-						CCV_SWAP(bstride[0], bstride[3], t);
+						CCV_SWAP(bdim[0], bdim[b_nd - 1], t);
+						CCV_SWAP(bstride[0], bstride[b_nd - 1], t);
 					}
 				}
 				// Mark this as tensor view as we changed its stride and dim.
