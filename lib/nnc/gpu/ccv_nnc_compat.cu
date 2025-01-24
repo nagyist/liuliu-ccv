@@ -856,6 +856,8 @@ cudaDataType_t ccv_nnc_cuda_datatype(int datatype)
 			return CUDA_R_32F;
 		case CCV_16F:
 			return CUDA_R_16F;
+		case CCV_16BF:
+			return CUDA_R_16BF;
 		case CCV_32F:
 			return CUDA_R_32F;
 		case CCV_64F:
@@ -874,6 +876,8 @@ cublasComputeType_t ccv_nnc_cuda_compute_datatype(int datatype)
 		case CCV_32S:
 			return CUBLAS_COMPUTE_32F;
 		case CCV_16F:
+			return CUBLAS_COMPUTE_32F;
+		case CCV_16BF:
 			return CUBLAS_COMPUTE_32F;
 		case CCV_32F:
 			return CUBLAS_COMPUTE_32F;
@@ -897,6 +901,8 @@ cudnnDataType_t ccv_nnc_cudnn_datatype(int datatype)
 			return CUDNN_DATA_INT32;
 		case CCV_16F:
 			return CUDNN_DATA_HALF;
+		case CCV_16BF:
+			return CUDNN_DATA_BFLOAT16;
 		case CCV_32F:
 			return CUDNN_DATA_FLOAT;
 		case CCV_64F:
@@ -1486,7 +1492,8 @@ ccv_nnc_cudnn_convolution_descriptor_t ccv_nnc_cudnn_get_convolution_descriptor(
 	{
 		CUDNN_ENFORCE(cudnnSetConvolution2dDescriptor(convolution_desc.descriptor, p[0], p[1], v[0], v[1], u[0], u[1], CUDNN_CROSS_CORRELATION, ccv_nnc_cudnn_datatype(datatype)));
 	} else {
-		CUDNN_ENFORCE(cudnnSetConvolutionNdDescriptor(convolution_desc.descriptor, size_nd, p, v, u, CUDNN_CROSS_CORRELATION, ccv_nnc_cudnn_datatype(datatype)));
+		// For 3D convolution, only supported compute type is float.
+		CUDNN_ENFORCE(cudnnSetConvolutionNdDescriptor(convolution_desc.descriptor, size_nd, p, v, u, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 	}
 	CUDNN_ENFORCE(cudnnSetConvolutionMathType(convolution_desc.descriptor, CUDNN_TENSOR_OP_MATH));
 	return convolution_desc;
