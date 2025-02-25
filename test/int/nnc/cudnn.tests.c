@@ -5511,6 +5511,63 @@ TEST_CASE("cudnn forward convolution transpose")
 	ccv_nnc_tensor_free(ga);
 }
 
+TEST_CASE("cudnn forward convolution transpose, w in nchw format")
+{
+	GUARD_ELSE_RETURN(ccv_nnc_cmd_ok(CCV_NNC_CONVOLUTION_TRANSPOSE_FORWARD, CCV_NNC_BACKEND_GPU_CUDNN));
+	ccv_nnc_tensor_t* a = ccv_nnc_tensor_new(0, CPU_TENSOR_NHWC(32F, BATCH_SIZE, OUTPUT_SIZE, OUTPUT_SIZE, OUTPUT_DIM), 0);
+	ccv_nnc_tensor_t* b = ccv_nnc_tensor_new(0, CPU_TENSOR_NHWC(32F, BATCH_SIZE, INPUT_SIZE, INPUT_SIZE, INPUT_DIM), 0);
+	ccv_nnc_cmd_t cmd = CMD_CONVOLUTION_TRANSPOSE_FORWARD(1, INPUT_DIM, 0, KERNEL_SIZE, KERNEL_SIZE, OUTPUT_DIM);
+	cmd.backend = CCV_NNC_BACKEND_CPU_REF;
+	assert(cmd.backend >= 0);
+	ccv_nnc_hint_t hint = ccv_nnc_hint_auto(cmd.info, b->info, a->info);
+	ccv_nnc_tensor_t* w = ccv_nnc_tensor_new(0, CPU_TENSOR_NHWC(32F, OUTPUT_DIM, KERNEL_SIZE, KERNEL_SIZE, INPUT_DIM), 0);
+	ccv_nnc_tensor_t* bias = ccv_nnc_tensor_new(0, CPU_TENSOR_NHWC(32F, INPUT_DIM), 0);
+	// configure the inlets.
+	dsfmt_t dsfmt;
+	dsfmt_init_gen_rand(&dsfmt, 0);
+	int i;
+	for (i = 0; i < INPUT_DIM * KERNEL_SIZE * KERNEL_SIZE * OUTPUT_DIM; i++)
+		w->data.f32[i] = dsfmt_genrand_open_close(&dsfmt) / (INPUT_DIM * KERNEL_SIZE * KERNEL_SIZE);
+	for (i = 0; i < OUTPUT_SIZE * OUTPUT_SIZE * OUTPUT_DIM * ccv_max(1, BATCH_SIZE); i++)
+		a->data.f32[i] = dsfmt_genrand_open_close(&dsfmt);
+	for (i = 0; i < INPUT_DIM; i++)
+		bias->data.f32[i] = (float)i / INPUT_DIM;
+	// Copy generated matrix values over to GPU.
+	ccv_nnc_tensor_t* ga = ccv_nnc_tensor_new(0, GPU_TENSOR_NHWC(000, 32F, BATCH_SIZE, OUTPUT_SIZE, OUTPUT_SIZE, OUTPUT_DIM), 0);
+	ccv_nnc_tensor_t* gw = ccv_nnc_tensor_new(0, GPU_TENSOR_NHWC(000, 32F, OUTPUT_DIM, KERNEL_SIZE, KERNEL_SIZE, INPUT_DIM), 0);
+	ccv_nnc_tensor_t* gwo = ccv_nnc_tensor_new(0, GPU_TENSOR_NCHW(000, 32F, OUTPUT_DIM, INPUT_DIM, KERNEL_SIZE, KERNEL_SIZE), 0);
+	ccv_nnc_tensor_t* gbias = ccv_nnc_tensor_new(0, GPU_TENSOR_NHWC(000, 32F, INPUT_DIM), 0);
+	ccv_nnc_cmd_t move = CMD_DATA_TRANSFER_FORWARD();
+	move.backend = CCV_NNC_BACKEND_GPU_REF;
+	assert(move.backend >= 0);
+	ccv_nnc_cmd_exec(move, ccv_nnc_no_hint, 0, TENSOR_LIST(a, w, bias), TENSOR_LIST(ga, gw, gbias), 0);
+	ccv_nnc_cmd_exec(cmd, hint, 0, TENSOR_LIST(a, w, bias), TENSOR_LIST(b), 0);
+	ccv_nnc_tensor_t* gc = ccv_nnc_tensor_new(0, GPU_TENSOR_NHWC(000, 32F, BATCH_SIZE, INPUT_SIZE, INPUT_SIZE, INPUT_DIM), 0);
+	ccv_nnc_cmd_exec(CMD_FORMAT_TRANSFORM_FORWARD(), ccv_nnc_no_hint, 0, TENSOR_LIST(gw), TENSOR_LIST(gwo), 0);
+
+	ccv_nnc_stream_context_t* stream_context = ccv_nnc_stream_context_new(CCV_STREAM_CONTEXT_GPU);
+	cmd.backend = CCV_NNC_BACKEND_GPU_CUDNN;
+	assert(cmd.backend >= 0);
+	cmd.algorithm = -1;
+	cmd = ccv_nnc_cmd_autotune(cmd, 1 * 1024 * 1024 * 1024, hint, 0, TENSOR_LIST(ga, gwo, gbias), TENSOR_LIST(gc), stream_context);
+	assert(CCV_NNC_EXEC_SUCCESS == ccv_nnc_cmd_exec(cmd, hint, 0, TENSOR_LIST(ga, gwo, gbias), TENSOR_LIST(gc), stream_context));
+	ccv_nnc_stream_context_wait(stream_context);
+	ccv_nnc_stream_context_free(stream_context);
+	ccv_nnc_tensor_t* c = ccv_nnc_tensor_new(0, CPU_TENSOR_NHWC(32F, BATCH_SIZE, INPUT_SIZE, INPUT_SIZE, INPUT_DIM), 0);
+	ccv_nnc_cmd_exec(move, ccv_nnc_no_hint, 0, TENSOR_LIST(gc), TENSOR_LIST(c), 0);
+	REQUIRE_ARRAY_EQ_WITH_TOLERANCE(float, b->data.f32, c->data.f32, BATCH_SIZE * INPUT_DIM * INPUT_SIZE * INPUT_SIZE, 2e-4, "output from cudnn should match from CPU");
+	ccv_nnc_tensor_free(c);
+	ccv_nnc_tensor_free(gc);
+	ccv_nnc_tensor_free(bias);
+	ccv_nnc_tensor_free(w);
+	ccv_nnc_tensor_free(b);
+	ccv_nnc_tensor_free(a);
+	ccv_nnc_tensor_free(gbias);
+	ccv_nnc_tensor_free(gw);
+	ccv_nnc_tensor_free(gwo);
+	ccv_nnc_tensor_free(ga);
+}
+
 TEST_CASE("cudnn forward convolution transpose in nchw format")
 {
 	GUARD_ELSE_RETURN(ccv_nnc_cmd_ok(CCV_NNC_CONVOLUTION_TRANSPOSE_FORWARD, CCV_NNC_BACKEND_GPU_CUDNN));
