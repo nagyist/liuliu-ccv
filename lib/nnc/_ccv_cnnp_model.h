@@ -167,6 +167,7 @@ struct ccv_cnnp_model_s {
 	int gradient_checkpointing; // Whether to enable gradient checkpointing for training phase.
 	int is_trainable; // Whether this model can be trained or not.
 	int memory_reduction; // Whether to enable memory reduction techniques for training phase.
+	int exec_flags; // The flags to be applied to the execution nodes.
 	size_t workspace_size; // Set the default workspace size.
 	struct {
 		ccv_cnnp_model_io_reader_f reader;
@@ -259,6 +260,7 @@ static inline void ccv_cnnp_model_add_to_output(ccv_cnnp_model_t* const self, co
 }
 
 typedef struct {
+	int exec_flags;
 	int is_trainable;
 	int is_gradient_checkpointing;
 	ccv_cnnp_model_sequence_t* model_sequence;
@@ -321,7 +323,10 @@ static inline void ccv_cnnp_model_build(ccv_cnnp_model_t* const self, ccv_nnc_sy
 {
 	assert(self->data);
 	ccv_cnnp_model_build_data_t* const build_data = (ccv_cnnp_model_build_data_t*)self->data;
+	const int old_exec_flags = build_data->exec_flags;
 	const int old_is_trainable = build_data->is_trainable;
+	if (self->exec_flags)
+		build_data->exec_flags |= self->exec_flags;
 	if (self->is_trainable >= 0)
 		build_data->is_trainable = self->is_trainable;
 	if (self->name && self->name[0] != '\0')
@@ -413,6 +418,7 @@ static inline void ccv_cnnp_model_build(ccv_cnnp_model_t* const self, ccv_nnc_sy
 		ccv_cnnp_model_pop(self, build_data->model_sequence);
 	} else if (self->name && self->name[0] != '\0')
 		ccv_cnnp_model_pop(self, build_data->model_sequence);
+	build_data->exec_flags = old_exec_flags;
 	build_data->is_trainable = old_is_trainable;
 }
 

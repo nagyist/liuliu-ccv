@@ -188,6 +188,22 @@ static void _ccv_cnnp_compiled_data_init(ccv_cnnp_compiled_data_t* const compile
 	compiled_data->gradient_checkpoints = gradient_checkpoints;
 }
 
+typedef struct {
+	void* old_graph_exec_symbol_new_hook_context;
+	ccv_nnc_graph_exec_symbol_new_hook_f old_graph_exec_symbol_new_hook;
+	ccv_nnc_symbolic_graph_t* graph;
+	ccv_cnnp_model_build_data_t* build_data;
+} ccv_cnnp_model_set_exec_flags_context_t;
+
+static void _ccv_cnnp_model_set_exec_flags(void* context, const ccv_nnc_graph_exec_symbol_t symbol, const ccv_nnc_cmd_t cmd, const ccv_nnc_tensor_symbol_t* const inputs, const int input_size, const ccv_nnc_tensor_symbol_t* const outputs, const int output_size, const char* const name)
+{
+	ccv_cnnp_model_set_exec_flags_context_t* flags_context = (ccv_cnnp_model_set_exec_flags_context_t*)context;
+	if (flags_context->build_data->exec_flags)
+		ccv_nnc_graph_exec_symbol_set_flags(flags_context->graph, symbol, flags_context->build_data->exec_flags);
+	if (flags_context->old_graph_exec_symbol_new_hook)
+		flags_context->old_graph_exec_symbol_new_hook(flags_context->old_graph_exec_symbol_new_hook_context, symbol, cmd, inputs, input_size, outputs, output_size, name);
+}
+
 static void _ccv_cnnp_model_compile(ccv_cnnp_model_t* const model, const ccv_nnc_tensor_param_t* const inputs, const int input_size, const ccv_nnc_cmd_t loss)
 {
 	assert(model->graph);
@@ -220,6 +236,7 @@ static void _ccv_cnnp_model_compile(ccv_cnnp_model_t* const model, const ccv_nnc
 		.trainables = 0,
 	};
 	ccv_cnnp_model_build_data_t build_data = {
+		.exec_flags = 0,
 		.is_trainable = model->is_trainable >= 0 ? model->is_trainable : 1,
 		.model_sequence = &model_sequence,
 		.add_to_array = ccv_cnnp_model_add_to_array,
@@ -231,7 +248,16 @@ static void _ccv_cnnp_model_compile(ccv_cnnp_model_t* const model, const ccv_nnc
 		.gradient_checkpoints = 0,
 	};
 	model->data = &build_data;
+	ccv_cnnp_model_set_exec_flags_context_t flags_context = {
+		.graph = model->graph,
+		.build_data = &build_data,
+		.old_graph_exec_symbol_new_hook = 0,
+		.old_graph_exec_symbol_new_hook_context = 0
+	};
+	flags_context.old_graph_exec_symbol_new_hook_context = ccv_nnc_graph_exec_symbol_new_hook(model->graph, _ccv_cnnp_model_set_exec_flags, &flags_context, &flags_context.old_graph_exec_symbol_new_hook);
 	ccv_cnnp_model_build(model, model->graph, model->inputs, input_size, 0, 0);
+	// Reset back to previous hook.
+	ccv_nnc_graph_exec_symbol_new_hook(model->graph, flags_context.old_graph_exec_symbol_new_hook, flags_context.old_graph_exec_symbol_new_hook_context, 0);
 	for (i = 0; i < model->output_size; i++)
 	{
 		const ccv_nnc_tensor_symbol_t output = model->outputs[i];
@@ -3067,4 +3093,14 @@ void ccv_cnnp_model_cancel(ccv_cnnp_model_t* const model)
 		ccv_nnc_graph_cancel(compiled_data->graph);
 	if (compiled_data->apply_gradients.graph)
 		ccv_nnc_graph_cancel(compiled_data->apply_gradients.graph);
+}
+
+void ccv_cnnp_model_set_flags(ccv_cnnp_model_t* const model, const int flags)
+{
+	model->exec_flags = flags;
+}
+
+int ccv_cnnp_model_flags(ccv_cnnp_model_t* const model)
+{
+	return model->exec_flags;
 }

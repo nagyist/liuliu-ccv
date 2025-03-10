@@ -1836,7 +1836,7 @@ int ccv_nnc_tensor_symbol_alias_params(const ccv_nnc_symbolic_graph_t* const gra
  * @param tensor The tensor symbol reference.
  * @param flags A reserved field for flags.
  */
-int ccv_nnc_tensor_symbol_set_flags(ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_tensor_symbol_t tensor, const int flags);
+void ccv_nnc_tensor_symbol_set_flags(ccv_nnc_symbolic_graph_t* const graph, const ccv_nnc_tensor_symbol_t tensor, const int flags);
 /**
  * Get all the flags for a tensor.
  * @param graph The symbolic graph.
@@ -3827,6 +3827,19 @@ void ccv_cnnp_model_apply_gradients(ccv_cnnp_model_t* const model, ccv_nnc_strea
  * @param model The composed model.
  */
 void ccv_cnnp_model_cancel(ccv_cnnp_model_t* const model);
+/**
+ * Set flags for the exec symbols created by the model. See CCV_NNC_GRAPH_EXEC_* for details.
+ * Note that practically right now, only DISABLE_OPT is useful.
+ * @param model The composed model before apply / evaluate.
+ * @param flags The flags to set on all exec symbols potentially associated with this model.
+ */
+void ccv_cnnp_model_set_flags(ccv_cnnp_model_t* const model, const int flags);
+/**
+ * Get flags for the exec symbols created by the model. See CCV_NNC_GRAPH_EXEC_* for details.
+ * Note that practically right now, only DISABLE_OPT is useful.
+ * @param model The composed model before apply / evaluate.
+ */
+CCV_WARN_UNUSED(int) ccv_cnnp_model_flags(ccv_cnnp_model_t* const model);
 enum {
 	/**
 	 * This is the default flag, if the model is not initialized, will attempt to read from the disk.
